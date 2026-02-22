@@ -1,0 +1,13 @@
+At start:
+
+python -m venv venv
+.\venv\Scripts\activate
+
+For Database:
+powershell -ExecutionPolicy Bypass -File "C:\Users\user\Downloads\ASE\setup_db.ps1"
+
+for main:
+python app.py
+
+for frontend:
+npm run dev
