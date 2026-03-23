@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const API_URL = "http://localhost:5000/api";
 
@@ -71,7 +71,7 @@ function mockAPI(message) {
   for (const [cat, kws] of Object.entries(intentDefs)) {
     const matched = kws.filter(k => k.includes(' ') ? lower.includes(k) : tokens.includes(k) || tokens.some(t => (t.startsWith(k) || k.startsWith(t)) && Math.abs(t.length - k.length) <= 3));
     if (matched.length > 0) {
-      const score = Math.min(matched.length / kws.length + matched.length * 0.1, 1.0);
+      const score = Math.min(matched.length / Math.min(kws.length, 5) + matched.length * 0.15, 1.0);
       allIntents.push({ intent: cat, score: Math.round(score * 1000) / 1000 });
       matchedKws[cat] = matched;
       if (score > bestScore) { bestScore = score; bestIntent = cat; }
@@ -106,32 +106,32 @@ function mockAPI(message) {
 
     if (isRefund && order.transaction) {
       if (order.transaction.refund_eligible) {
-        responseText = `${empathy}Hi ${order.first_name}! Order ${order.order_id} is eligible for a full refund of $${order.total}. It will be processed to your ${order.transaction.payment_method} within 5-7 business days. Items: ${items}. Proceed?`;
+        responseText = `${empathy}Order ${order.order_id} is eligible for a full refund of $${order.total}. It will be processed to your ${order.transaction.payment_method} within 5-7 business days. Items: ${items}. Proceed?`;
         source = "db_refund_eligible";
       } else {
-        responseText = `${empathy}Hi ${order.first_name}, order ${order.order_id} is outside the 30-day refund window (deadline: ${order.transaction.refund_deadline}). Total: $${order.total}. Items: ${items}. Want me to connect you with a specialist?`;
+        responseText = `${empathy}Order ${order.order_id} is outside the 30-day refund window (deadline: ${order.transaction.refund_deadline}). Total: $${order.total}. Items: ${items}. Want me to connect you with a specialist?`;
         source = "db_refund_ineligible";
       }
     } else if (order.status === "delivered") {
-      responseText = `${empathy}Hi ${order.first_name}! Order ${order.order_id} was delivered on ${order.delivered_date}. Items: ${items}. Total: $${order.total}. Anything else about this order?`;
+      responseText = `${empathy}Order ${order.order_id} was delivered on ${order.delivered_date}. Items: ${items}. Total: $${order.total}. Anything else about this order?`;
       source = "db_order_delivered";
     } else if (["shipped", "in_transit", "out_for_delivery"].includes(order.status)) {
       const track = order.tracking_number ? ` Tracking: ${order.tracking_number} via ${order.carrier}.` : "";
       const eta = order.estimated_delivery ? ` ETA: ${order.estimated_delivery}.` : "";
       const note = order.notes ? ` Note: ${order.notes}` : "";
-      responseText = `${empathy}Hi ${order.first_name}! Order ${order.order_id} is ${order.status.replace(/_/g, " ")}.${track}${eta}${note} Items: ${items}.`;
+      responseText = `${empathy}Order ${order.order_id} is ${order.status.replace(/_/g, " ")}.${track}${eta}${note} Items: ${items}.`;
       source = "db_order_in_transit";
     } else if (order.status === "processing") {
-      responseText = `${empathy}Hi ${order.first_name}! Order ${order.order_id} is being processed. Items: ${items}. Total: $${order.total}. You'll get tracking once it ships.`;
+      responseText = `${empathy}Order ${order.order_id} is being processed. Items: ${items}. Total: $${order.total}. You'll get tracking once it ships.`;
       source = "db_order_processing";
     } else if (order.status === "cancelled") {
-      responseText = `${empathy}Hi ${order.first_name}, order ${order.order_id} was cancelled.${order.notes ? " " + order.notes + "." : ""} Items: ${items}. Total: $${order.total}.`;
+      responseText = `${empathy}Order ${order.order_id} was cancelled.${order.notes ? " " + order.notes + "." : ""} Items: ${items}. Total: $${order.total}.`;
       source = "db_order_cancelled";
     } else if (order.status === "returned") {
-      responseText = `${empathy}Hi ${order.first_name}, order ${order.order_id} was returned. Items: ${items}. Total: $${order.total}. Refund takes 5-7 business days.`;
+      responseText = `${empathy}Order ${order.order_id} was returned. Items: ${items}. Total: $${order.total}. Refund takes 5-7 business days.`;
       source = "db_order_returned";
     } else {
-      responseText = `${empathy}Hi ${order.first_name}! Order ${order.order_id}: ${order.status.toUpperCase()}, $${order.total}. Items: ${items}.`;
+      responseText = `${empathy}Order ${order.order_id}: ${order.status.toUpperCase()}, $${order.total}. Items: ${items}.`;
       source = "db_order_generic";
     }
   } else if (transaction) {
@@ -165,15 +165,15 @@ function mockAPI(message) {
     responseText = `${empathy}I can help with orders, refunds, billing, subscriptions, and accounts. Try sharing an order ID (ORD-XXXXXX) or customer ID!`; source = "fallback";
   }
 
-  // Confidence calculation with 5 factors
-  const f1 = bestScore * 0.30;
+  // Confidence calculation with 5 factors (weights: 20/10/15/15/40)
+  const f1 = bestScore * 0.20;
   const clarityVal = allIntents.length >= 2 ? Math.min((allIntents[0].score - allIntents[1].score) * 2, 1) : (allIntents.length === 1 ? allIntents[0].score : 0);
-  const f2 = clarityVal * 0.20;
+  const f2 = clarityVal * 0.10;
   const specVal = tokens.length <= 2 ? 0.3 : tokens.length <= 5 ? 0.6 : tokens.length <= 15 ? 0.9 : 1.0;
   const f3 = specVal * 0.15;
-  const f4 = 0.7 * 0.10;
+  const f4 = 0.7 * 0.15;
   const dvVal = dbFound ? 1.0 : (dbErrors.length > 0 ? 0.3 : 0);
-  const f5 = dvVal * 0.25;
+  const f5 = dvVal * 0.40;
   const totalConf = Math.round((f1 + f2 + f3 + f4 + f5) * 1000) / 10;
   const confLevel = totalConf >= 75 ? "high" : totalConf >= 50 ? "medium" : totalConf >= 30 ? "low" : "very_low";
 
@@ -184,16 +184,17 @@ function mockAPI(message) {
 
   return {
     response: responseText,
+    interaction_id: `mock-${Date.now()}`,
     response_meta: { source, data_verified: dataVerified, data_used: dataUsed },
     confidence: {
       score: totalConf, level: confLevel,
       description: confLevel === "high" ? "Highly confident — verified against database." : confLevel === "medium" ? "Moderately confident. An ID would improve accuracy." : confLevel === "low" ? "Limited confidence. More details would help." : "Not confident. Recommending human agent.",
       factors: [
-        { name: "Intent Match", weight: "30%", raw_score: Math.round(bestScore * 100), weighted_score: Math.round(f1 * 100), explanation: `Matched '${bestIntent}' category` },
-        { name: "Intent Clarity", weight: "20%", raw_score: Math.round(clarityVal * 100), weighted_score: Math.round(f2 * 100), explanation: allIntents.length >= 2 ? "Multiple categories detected" : "Single clear category" },
+        { name: "Intent Match Strength", weight: "20%", raw_score: Math.round(bestScore * 100), weighted_score: Math.round(f1 * 100), explanation: `Matched '${bestIntent}' category` },
+        { name: "Intent Clarity", weight: "10%", raw_score: Math.round(clarityVal * 100), weighted_score: Math.round(f2 * 100), explanation: allIntents.length >= 2 ? "Multiple categories detected" : "Single clear category" },
         { name: "Query Specificity", weight: "15%", raw_score: Math.round(specVal * 100), weighted_score: Math.round(f3 * 100), explanation: `${tokens.length} words in query` },
-        { name: "Sentiment Alignment", weight: "10%", raw_score: 70, weighted_score: Math.round(f4 * 100), explanation: "Sentiment consistency check" },
-        { name: "Data Verification", weight: "25%", raw_score: Math.round(dvVal * 100), weighted_score: Math.round(f5 * 100), explanation: dbFound ? `Verified: ${dbLookups.join(", ")}` : dbErrors.length ? "ID not found" : "No IDs provided" }
+        { name: "Sentiment Alignment", weight: "15%", raw_score: 70, weighted_score: Math.round(f4 * 100), explanation: "Sentiment consistency check" },
+        { name: "Data Verification", weight: "40%", raw_score: Math.round(dvVal * 100), weighted_score: Math.round(f5 * 100), explanation: dbFound ? `Verified: ${dbLookups.join(", ")}` : dbErrors.length ? "ID not found" : "No IDs provided" }
       ],
       missing_information: missing
     },
@@ -255,8 +256,8 @@ const DataBadge = ({ meta }) => {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
       background: v ? "#052e16" : "#1e293b", border: `1px solid ${v ? "#16a34a" : "#334155"}`, color: v ? "#4ade80" : "#94a3b8" }}>
-      {v ? "✓ DB Verified" : "◯ No DB Data"}
-      {meta.source && <span style={{ opacity: 0.6 }}> • {meta.source.replace(/_/g, " ")}</span>}
+      {v ? "\u2713 DB Verified" : "\u25CB No DB Data"}
+      {meta.source && <span style={{ opacity: 0.6 }}> &bull; {meta.source.replace(/_/g, " ")}</span>}
     </span>
   );
 };
@@ -277,8 +278,8 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
 
           {db && db.lookups_performed?.length > 0 && (
             <div style={{ marginBottom: 16, padding: 12, background: "#0a2540", border: "1px solid #1e3a5f", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>🔍 Database Lookups</div>
-              {db.lookups_performed.map((l, i) => <div key={i} style={{ fontSize: 12, color: "#93c5fd", marginBottom: 2 }}>• {l}</div>)}
+              <div style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Database Lookups</div>
+              {db.lookups_performed.map((l, i) => <div key={i} style={{ fontSize: 12, color: "#93c5fd", marginBottom: 2 }}>&bull; {l}</div>)}
               {db.ids_extracted && Object.keys(db.ids_extracted).length > 0 && (
                 <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>IDs: {JSON.stringify(db.ids_extracted)}</div>
               )}
@@ -299,13 +300,13 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
             background: data.explainability.sentiment.label === "positive" ? "#052e16" : data.explainability.sentiment.label === "negative" ? "#350a0a" : "#172554",
             border: `1px solid ${data.explainability.sentiment.label === "positive" ? "#16a34a" : data.explainability.sentiment.label === "negative" ? "#dc2626" : "#2563eb"}`,
             color: data.explainability.sentiment.label === "positive" ? "#4ade80" : data.explainability.sentiment.label === "negative" ? "#f87171" : "#60a5fa" }}>
-            {data.explainability.sentiment.label === "positive" ? "↑" : data.explainability.sentiment.label === "negative" ? "↓" : "→"} {data.explainability.sentiment.label} ({data.explainability.sentiment.score})
+            {data.explainability.sentiment.label === "positive" ? "\u2191" : data.explainability.sentiment.label === "negative" ? "\u2193" : "\u2192"} {data.explainability.sentiment.label} ({data.explainability.sentiment.score})
           </span>
 
           {data.confidence.missing_information?.length > 0 && (
             <div style={{ marginTop: 12, padding: 12, background: "#1c1917", border: "1px solid #78350f", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>ℹ Information I'm missing:</div>
-              {data.confidence.missing_information.map((m, i) => <div key={i} style={{ fontSize: 12, color: "#d97706", marginBottom: 2 }}>• {m}</div>)}
+              <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>Information I'm missing:</div>
+              {data.confidence.missing_information.map((m, i) => <div key={i} style={{ fontSize: 12, color: "#d97706", marginBottom: 2 }}>&bull; {m}</div>)}
             </div>
           )}
         </div>
@@ -314,7 +315,49 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
   );
 };
 
-const ChatMessage = ({ msg, explainOpen, toggleExplain }) => {
+/* ═══════════════════════════════════════════════════════════════
+   FEEDBACK BUTTONS (Feature 6)
+   ═══════════════════════════════════════════════════════════════ */
+const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
+  const [submitted, setSubmitted] = useState(null); // "up" | "down" | null
+
+  const submit = async (type) => {
+    const rating = type === "up" ? 5 : 1;
+    setSubmitted(type);
+    if (onFeedback) onFeedback(type);
+    if (!useMock && interactionId) {
+      try {
+        await fetch(`${API_URL}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ interaction_id: interactionId, rating })
+        });
+      } catch { /* silent */ }
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
+        {submitted === "up" ? "\u{1F44D}" : "\u{1F44E}"} Feedback recorded — thank you!
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center" }}>
+      <span style={{ fontSize: 11, color: "#475569" }}>Was this helpful?</span>
+      <button onClick={() => submit("up")}
+        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
+        title="Helpful">{"\u{1F44D}"}</button>
+      <button onClick={() => submit("down")}
+        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
+        title="Not helpful">{"\u{1F44E}"}</button>
+    </div>
+  );
+};
+
+const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
   const isUser = msg.role === "user";
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 16, animation: "slideUp 0.3s ease" }}>
@@ -331,16 +374,227 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain }) => {
               <DataBadge meta={msg.apiData.response_meta} />
             </div>
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, maxWidth: 400 }}>{msg.apiData.confidence.description}</div>
+            <FeedbackButtons interactionId={msg.apiData.interaction_id} useMock={useMock} />
           </div>
         )}
         {!isUser && msg.apiData?.handoff?.recommended && (
           <div style={{ marginTop: 8, padding: 10, background: "#2d1515", border: "1px solid #991b1b", borderRadius: 8, fontSize: 12, color: "#fca5a5" }}>
-            🔄 <strong>Human handoff:</strong> {msg.apiData.handoff.reasons.join("; ")}
+            <strong>Human handoff:</strong> {msg.apiData.handoff.reasons.join("; ")}
             <button style={{ display: "block", marginTop: 6, padding: "6px 14px", background: "#dc2626", border: "none", borderRadius: 6, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Connect with Agent</button>
           </div>
         )}
         {!isUser && msg.apiData && <ExplainPanel data={msg.apiData} isOpen={explainOpen} toggle={toggleExplain} />}
       </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   ANALYTICS DASHBOARD (Feature 5)
+   ═══════════════════════════════════════════════════════════════ */
+const StatCard = ({ label, value, sub, color = "#e2e8f0" }) => (
+  <div style={{ flex: "1 1 180px", padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
+    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+    <div style={{ fontSize: 28, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{sub}</div>}
+  </div>
+);
+
+const IntentBar = ({ intent, count, max }) => {
+  const pct = max > 0 ? (count / max) * 100 : 0;
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+        <span style={{ color: "#cbd5e1" }}>{intent}</span>
+        <span style={{ color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{count}</span>
+      </div>
+      <div style={{ height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", borderRadius: 3, transition: "width 0.6s ease" }} />
+      </div>
+    </div>
+  );
+};
+
+const AnalyticsDashboard = ({ useMock }) => {
+  const [data, setData] = useState(null);
+  const [retrain, setRetrain] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (useMock) {
+      // Generate mock analytics
+      await new Promise(r => setTimeout(r, 300));
+      setData({
+        total_queries: 142,
+        handoff_count: 8,
+        resolution_rate: 94.4,
+        avg_confidence: 62.3,
+        avg_feedback_rating: 4.1,
+        total_feedback: 37,
+        intent_distribution: [
+          { detected_intent: "order_status", cnt: 42 },
+          { detected_intent: "billing", cnt: 28 },
+          { detected_intent: "refund", cnt: 22 },
+          { detected_intent: "shipping", cnt: 18 },
+          { detected_intent: "technical", cnt: 12 },
+          { detected_intent: "subscription", cnt: 9 },
+          { detected_intent: "account", cnt: 6 },
+          { detected_intent: "greeting", cnt: 5 }
+        ],
+        recent_feedback: [
+          { rating: 5, comment: "Got my order info immediately!", user_message: "Status of ORD-100001", detected_intent: "order_status", confidence_score: 82.1, created_at: "2026-03-23T10:15:00" },
+          { rating: 1, comment: "Didn't understand my question", user_message: "quantum flux error in my order", detected_intent: "unknown", confidence_score: 12.0, retrain_flag: true, created_at: "2026-03-23T09:42:00" },
+          { rating: 4, comment: null, user_message: "Refund for ORD-100002", detected_intent: "refund", confidence_score: 76.5, created_at: "2026-03-22T16:30:00" },
+          { rating: 2, comment: "Had to rephrase multiple times", user_message: "my thing isnt working", detected_intent: "technical", confidence_score: 28.0, retrain_flag: true, created_at: "2026-03-22T14:20:00" },
+          { rating: 5, comment: "Loved the transparency!", user_message: "Show me CUST-001004", detected_intent: "account", confidence_score: 88.3, created_at: "2026-03-22T11:05:00" }
+        ],
+        daily_volume: [
+          { day: "2026-03-17", cnt: 18 }, { day: "2026-03-18", cnt: 22 },
+          { day: "2026-03-19", cnt: 15 }, { day: "2026-03-20", cnt: 25 },
+          { day: "2026-03-21", cnt: 20 }, { day: "2026-03-22", cnt: 28 },
+          { day: "2026-03-23", cnt: 14 }
+        ]
+      });
+      setRetrain({
+        candidates: [
+          { interaction_id: "mock-1", user_message: "quantum flux error in my order", detected_intent: "unknown", confidence_score: 12.0, rating: 1, comment: "Didn't understand my question", response_source: "fallback", created_at: "2026-03-23T09:42:00" },
+          { interaction_id: "mock-2", user_message: "my thing isnt working", detected_intent: "technical", confidence_score: 28.0, rating: 2, comment: "Had to rephrase multiple times", response_source: "technical_help", created_at: "2026-03-22T14:20:00" }
+        ],
+        count: 2
+      });
+      setLoading(false);
+      return;
+    }
+    try {
+      const [analyticsRes, retrainRes] = await Promise.all([
+        fetch(`${API_URL}/analytics`),
+        fetch(`${API_URL}/retrain_feedback`)
+      ]);
+      if (!analyticsRes.ok) throw new Error("Analytics endpoint unavailable");
+      setData(await analyticsRes.json());
+      if (retrainRes.ok) setRetrain(await retrainRes.json());
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, [useMock]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) {
+    return (
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+        Loading analytics...
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#f87171" }}>
+        <div>{error}</div>
+        <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", cursor: "pointer", fontSize: 13 }}>Retry</button>
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  const maxIntent = data.intent_distribution.length > 0 ? data.intent_distribution[0].cnt : 1;
+  const dailyMax = data.daily_volume.length > 0 ? Math.max(...data.daily_volume.map(d => d.cnt)) : 1;
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+      {/* KPI Cards */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <StatCard label="Total Queries" value={data.total_queries} />
+        <StatCard label="Resolution Rate" value={`${data.resolution_rate}%`} sub={`${data.handoff_count} handoffs`} color="#10b981" />
+        <StatCard label="Avg Confidence" value={`${data.avg_confidence}%`} color={data.avg_confidence >= 60 ? "#10b981" : data.avg_confidence >= 40 ? "#f59e0b" : "#ef4444"} />
+        <StatCard label="Avg Rating" value={data.avg_feedback_rating.toFixed(1)} sub={`${data.total_feedback} reviews`} color="#f59e0b" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        {/* Intent Distribution */}
+        <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Query Trends (Top Intents)</h3>
+          {data.intent_distribution.map((d, i) => (
+            <IntentBar key={i} intent={d.detected_intent} count={d.cnt} max={maxIntent} />
+          ))}
+        </div>
+
+        {/* Daily Volume Chart */}
+        <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Daily Query Volume</h3>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 140 }}>
+            {data.daily_volume.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
+                <div style={{ width: "100%", background: "linear-gradient(180deg, #3b82f6, #1e40af)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4 }} />
+                <div style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Feedback */}
+      <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Recent Feedback</h3>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #1e293b" }}>
+                {["Rating", "User Message", "Intent", "Confidence", "Comment", "Time"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", color: "#64748b", fontWeight: 500 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.recent_feedback.map((fb, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #0f172a" }}>
+                  <td style={{ padding: "8px 10px" }}>
+                    <span style={{ display: "inline-block", width: 28, textAlign: "center", padding: "2px 0", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                      background: fb.rating >= 4 ? "#052e16" : fb.rating <= 2 ? "#350a0a" : "#172554",
+                      color: fb.rating >= 4 ? "#4ade80" : fb.rating <= 2 ? "#f87171" : "#60a5fa" }}>
+                      {fb.rating}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#cbd5e1", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fb.user_message}</td>
+                  <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{fb.detected_intent}</td>
+                  <td style={{ padding: "8px 10px", color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{fb.confidence_score}%</td>
+                  <td style={{ padding: "8px 10px", color: "#64748b", fontStyle: fb.comment ? "normal" : "italic" }}>{fb.comment || "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "#475569", whiteSpace: "nowrap" }}>{fb.created_at ? new Date(fb.created_at).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Retrain Candidates (Feature 6) */}
+      {retrain && retrain.candidates && retrain.candidates.length > 0 && (
+        <div style={{ padding: 20, background: "#1a0a00", border: "1px solid #78350f", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#fbbf24" }}>Needs Retraining ({retrain.count})</h3>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#a16207" }}>These interactions received poor ratings and are flagged for NLP improvement.</p>
+          {retrain.candidates.map((c, i) => (
+            <div key={i} style={{ padding: 12, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8, marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500 }}>"{c.user_message}"</span>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#350a0a", color: "#f87171", fontWeight: 600 }}>
+                  Rating: {c.rating}/5
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b" }}>
+                <span>Intent: <strong style={{ color: "#94a3b8" }}>{c.detected_intent}</strong></span>
+                <span>Confidence: <strong style={{ color: "#94a3b8" }}>{c.confidence_score}%</strong></span>
+                <span>Source: <strong style={{ color: "#94a3b8" }}>{c.response_source}</strong></span>
+              </div>
+              {c.comment && <div style={{ marginTop: 4, fontSize: 11, color: "#a16207", fontStyle: "italic" }}>"{c.comment}"</div>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -356,6 +610,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [explainStates, setExplainStates] = useState({});
   const [useMock, setUseMock] = useState(true);
+  const [view, setView] = useState("chat"); // "chat" | "dashboard"
   const bottomRef = useRef(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -408,53 +663,74 @@ export default function App() {
       {/* Header */}
       <div style={{ padding: "16px 24px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #0f172a, #020617)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤖</div>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{"\u{1F916}"}</div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>Intelligent Support</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>NLP • Database Verified • Confidence Scoring • Explainable AI</div>
+            <div style={{ fontSize: 11, color: "#64748b" }}>NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI</div>
           </div>
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
-          <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "#3b82f6" }} />
-          Live API
-        </label>
-      </div>
-
-      {/* Quick Prompts */}
-      <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid #0f172a" }}>
-        {quickPrompts.map((p, i) => (
-          <button key={i} onClick={() => setInput(p)} style={{ whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 20, border: "1px solid #1e293b", background: "#0f172a", color: "#94a3b8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>{p}</button>
-        ))}
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-        {messages.map(msg => (
-          <ChatMessage key={msg.id} msg={msg} explainOpen={explainStates[msg.id] || false} toggleExplain={() => toggleExplain(msg.id)} />
-        ))}
-        {loading && (
-          <div style={{ display: "flex", gap: 6, padding: 16 }}>
-            {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", animation: `pulse 1s ease infinite ${i * 0.15}s` }} />)}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* View Toggle */}
+          <div style={{ display: "flex", background: "#1e293b", borderRadius: 8, overflow: "hidden", border: "1px solid #334155" }}>
+            <button onClick={() => setView("chat")}
+              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+                background: view === "chat" ? "#3b82f6" : "transparent", color: view === "chat" ? "#fff" : "#64748b" }}>
+              Chat
+            </button>
+            <button onClick={() => setView("dashboard")}
+              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+                background: view === "dashboard" ? "#3b82f6" : "transparent", color: view === "dashboard" ? "#fff" : "#64748b" }}>
+              Dashboard
+            </button>
           </div>
-        )}
-        <div ref={bottomRef} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
+            <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "#3b82f6" }} />
+            Live API
+          </label>
+        </div>
       </div>
 
-      {/* Input */}
-      <div style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", background: "#0f172a" }}>
-        <div style={{ display: "flex", gap: 10, maxWidth: 800, margin: "0 auto" }}>
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
-            placeholder="Ask about an order (ORD-100001), customer (CUST-001001), or describe your issue..."
-            style={{ flex: 1, padding: "12px 18px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontSize: 14, fontFamily: "inherit" }} />
-          <button onClick={send} disabled={loading || !input.trim()}
-            style={{ padding: "12px 24px", borderRadius: 12, border: "none", background: loading || !input.trim() ? "#1e293b" : "linear-gradient(135deg, #2563eb, #7c3aed)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer" }}>
-            Send
-          </button>
-        </div>
-        <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#475569" }}>
-          Transparent Confidence Scoring • Database Verified Responses • Click "Show AI Reasoning" for full breakdown
-        </div>
-      </div>
+      {view === "chat" ? (
+        <>
+          {/* Quick Prompts */}
+          <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid #0f172a" }}>
+            {quickPrompts.map((p, i) => (
+              <button key={i} onClick={() => setInput(p)} style={{ whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 20, border: "1px solid #1e293b", background: "#0f172a", color: "#94a3b8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>{p}</button>
+            ))}
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+            {messages.map(msg => (
+              <ChatMessage key={msg.id} msg={msg} explainOpen={explainStates[msg.id] || false} toggleExplain={() => toggleExplain(msg.id)} useMock={useMock} />
+            ))}
+            {loading && (
+              <div style={{ display: "flex", gap: 6, padding: 16 }}>
+                {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", animation: `pulse 1s ease infinite ${i * 0.15}s` }} />)}
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", background: "#0f172a" }}>
+            <div style={{ display: "flex", gap: 10, maxWidth: 800, margin: "0 auto" }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
+                placeholder="Ask about an order (ORD-100001), customer (CUST-001001), or describe your issue..."
+                style={{ flex: 1, padding: "12px 18px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontSize: 14, fontFamily: "inherit" }} />
+              <button onClick={send} disabled={loading || !input.trim()}
+                style={{ padding: "12px 24px", borderRadius: 12, border: "none", background: loading || !input.trim() ? "#1e293b" : "linear-gradient(135deg, #2563eb, #7c3aed)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer" }}>
+                Send
+              </button>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#475569" }}>
+              Transparent Confidence Scoring &bull; Database Verified Responses &bull; Click "Show AI Reasoning" for full breakdown
+            </div>
+          </div>
+        </>
+      ) : (
+        <AnalyticsDashboard useMock={useMock} />
+      )}
     </div>
   );
 }
