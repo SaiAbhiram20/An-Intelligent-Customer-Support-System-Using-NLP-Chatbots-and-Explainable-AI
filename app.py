@@ -27,12 +27,8 @@ from db_service import (
     get_order_by_id, get_orders_by_customer,
     get_transaction_by_id, get_transactions_by_customer,
     get_subscription_by_id, get_subscription_by_customer,
-<<<<<<< HEAD
     check_refund_eligibility,
     log_interaction, save_feedback, get_analytics_data, get_retrain_candidates
-=======
-    check_refund_eligibility
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
 )
 
 # ─── App ──────────────────────────────────────────────────────
@@ -166,17 +162,12 @@ def classify_intent(proc: dict) -> dict:
                         matched.append(kw); break
 
         if matched:
-<<<<<<< HEAD
             n_matched = len(matched)
             n_keywords = len(keywords)
             # Base coverage, but cap the denominator so large keyword lists
             # aren't unfairly penalised for matching only a few terms.
             coverage = n_matched / min(n_keywords, 5)
             bonus = min(n_matched * 0.15, 0.4)
-=======
-            coverage = len(matched) / len(keywords)
-            bonus = min(len(matched) * 0.1, 0.3)
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
             scores[category] = round(min(coverage + bonus, 1.0), 3)
             match_details[category] = matched
 
@@ -184,12 +175,8 @@ def classify_intent(proc: dict) -> dict:
         return {"primary_intent": "unknown", "confidence": 0.0, "all_intents": [],
                 "matched_keywords": {}, "explanations": ["No keywords matched any category."]}
 
-<<<<<<< HEAD
     # Sort by score descending, then by specificity (fewer keywords = more specific = preferred on tie)
     sorted_intents = sorted(scores.items(), key=lambda x: (x[1], -len(INTENT_KEYWORDS[x[0]])), reverse=True)
-=======
-    sorted_intents = sorted(scores.items(), key=lambda x: x[1], reverse=True)
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
     explanations = [f"'{cat}': matched [{', '.join(match_details[cat])}] → {s:.0%}" for cat, s in sorted_intents]
 
     return {
@@ -327,10 +314,6 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
     # ── ORDER-BASED RESPONSES ──
     if order:
-<<<<<<< HEAD
-=======
-        name = order.get("first_name", "there")
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
         items_str = ", ".join(i["product_name"] for i in order.get("items", []))
         data_used.append(f"order:{order['order_id']}")
         data_verified = True
@@ -340,11 +323,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             if refund_check:
                 if refund_check["eligible"]:
                     return {
-<<<<<<< HEAD
                         "text": f"{empathy}I've checked order {order['order_id']} and it is eligible for a full refund of ${order['total']}. "
-=======
-                        "text": f"{empathy}Hi {name}! I've checked order {order['order_id']} and it is eligible for a full refund of ${order['total']}. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                                 f"The refund will be processed to your {order['transaction']['payment_method'] if order.get('transaction') else 'original payment method'} "
                                 f"within 5-7 business days. "
                                 f"Items: {items_str}. "
@@ -353,11 +332,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
                     }
                 else:
                     return {
-<<<<<<< HEAD
                         "text": f"{empathy}I've looked into order {order['order_id']}. "
-=======
-                        "text": f"{empathy}Hi {name}, I've looked into order {order['order_id']}. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                                 f"Unfortunately, {refund_check['reason']} "
                                 f"The order total was ${order['total']} for: {items_str}. "
                                 f"Would you like me to connect you with a specialist to discuss alternative options?",
@@ -368,11 +343,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         if order["status"] == "delivered":
             delivery = order.get("delivered_date") or order.get("actual_delivery") or "recently"
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}Your order {order['order_id']} was successfully delivered on {delivery}. "
-=======
-                "text": f"{empathy}Hi {name}! Your order {order['order_id']} was successfully delivered on {delivery}. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"Items: {items_str}. Order total: ${order['total']}. "
                         f"Is there anything specific about this order I can help you with?",
                 "data_verified": True, "data_used": data_used, "source": "db_order_delivered"
@@ -383,22 +354,14 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             eta = f" Estimated delivery: {order['estimated_delivery']}." if order.get("estimated_delivery") else ""
             note = f" Note: {order['notes']}" if order.get("notes") else ""
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}Your order {order['order_id']} is currently {order['status'].replace('_',' ')}.{tracking}{eta}{note} "
-=======
-                "text": f"{empathy}Hi {name}! Your order {order['order_id']} is currently {order['status'].replace('_',' ')}.{tracking}{eta}{note} "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"Items: {items_str}. Total: ${order['total']}.",
                 "data_verified": True, "data_used": data_used, "source": "db_order_in_transit"
             }
 
         elif order["status"] == "processing":
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}Your order {order['order_id']} is currently being processed and will ship soon. "
-=======
-                "text": f"{empathy}Hi {name}! Your order {order['order_id']} is currently being processed and will ship soon. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"Items: {items_str}. Total: ${order['total']}. "
                         f"You'll receive a shipping confirmation with tracking details once it ships.",
                 "data_verified": True, "data_used": data_used, "source": "db_order_processing"
@@ -406,11 +369,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
         elif order["status"] == "cancelled":
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}Order {order['order_id']} was cancelled. "
-=======
-                "text": f"{empathy}Hi {name}, order {order['order_id']} was cancelled. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"{'Reason: ' + order['notes'] + '. ' if order.get('notes') else ''}"
                         f"Items: {items_str}. Original total: ${order['total']}. "
                         f"If a charge was made, the refund should already be processed. Would you like me to verify?",
@@ -419,11 +378,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
         elif order["status"] == "returned":
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}Order {order['order_id']} has been returned. "
-=======
-                "text": f"{empathy}Hi {name}, order {order['order_id']} has been returned. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"Items: {items_str}. Total: ${order['total']}. "
                         f"Please allow 5-7 business days for the refund to reflect on your statement. "
                         f"Can I help with anything else?",
@@ -432,11 +387,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
         else:
             return {
-<<<<<<< HEAD
                 "text": f"{empathy}I found your order {order['order_id']}. "
-=======
-                "text": f"{empathy}Hi {name}! I found your order {order['order_id']}. "
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
                         f"Status: {order['status'].upper()} | Total: ${order['total']} | Items: {items_str}. "
                         f"How can I help you with this order?",
                 "data_verified": True, "data_used": data_used, "source": "db_order_generic"
@@ -585,7 +536,6 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) -> dict:
     """
     Transparent confidence score (0-100) with full breakdown.
-<<<<<<< HEAD
 
     Factors:
       1. Intent Match Strength   (20%)
@@ -602,30 +552,11 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     matched_kws = intent["matched_keywords"].get(intent["primary_intent"], [])
     factors.append({
         "name": "Intent Match Strength", "weight": "20%",
-=======
-    
-    Factors:
-      1. Intent Match Strength   (30%)
-      2. Intent Clarity          (20%)
-      3. Query Specificity       (15%)
-      4. Sentiment Alignment     (10%)
-      5. Data Verification       (25%)  ← NEW: boosts confidence when DB data confirms the response
-    """
-    factors = []
-
-    # 1. Intent Match Strength (30%)
-    intent_score = intent["confidence"]
-    f1 = intent_score * 0.30
-    matched_kws = intent["matched_keywords"].get(intent["primary_intent"], [])
-    factors.append({
-        "name": "Intent Match Strength", "weight": "30%",
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
         "raw_score": round(intent_score * 100, 1),
         "weighted_score": round(f1 * 100, 1),
         "explanation": f"Matched {len(matched_kws)} keyword(s) in '{intent['primary_intent']}' category"
     })
 
-<<<<<<< HEAD
     # 2. Intent Clarity (10%)
     all_i = intent.get("all_intents", [])
     clarity = (all_i[0]["score"] - all_i[1]["score"]) if len(all_i) >= 2 else (all_i[0]["score"] if all_i else 0)
@@ -633,15 +564,6 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     f2 = clarity * 0.10
     factors.append({
         "name": "Intent Clarity", "weight": "10%",
-=======
-    # 2. Intent Clarity (20%)
-    all_i = intent.get("all_intents", [])
-    clarity = (all_i[0]["score"] - all_i[1]["score"]) if len(all_i) >= 2 else (all_i[0]["score"] if all_i else 0)
-    clarity = min(clarity * 2, 1.0)
-    f2 = clarity * 0.20
-    factors.append({
-        "name": "Intent Clarity", "weight": "20%",
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
         "raw_score": round(clarity * 100, 1),
         "weighted_score": round(f2 * 100, 1),
         "explanation": "Clear separation between top categories" if clarity > 0.5 else "Multiple categories matched similarly (ambiguous)"
@@ -659,11 +581,7 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
         "explanation": f"{spec_note.get(spec, '')} ({tc} tokens)"
     })
 
-<<<<<<< HEAD
     # 4. Sentiment Alignment (15%)
-=======
-    # 4. Sentiment Alignment (10%)
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
     primary = intent["primary_intent"]
     sl = sentiment["label"]
     if primary in ("technical","shipping","refund") and sl == "negative":
@@ -674,40 +592,24 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
         alignment = 0.7; a_note = "Neutral sentiment — no conflicting signals"
     else:
         alignment = 0.5; a_note = "Sentiment does not strongly align with intent"
-<<<<<<< HEAD
     f4 = alignment * 0.15
     factors.append({
         "name": "Sentiment Alignment", "weight": "15%",
-=======
-    f4 = alignment * 0.10
-    factors.append({
-        "name": "Sentiment Alignment", "weight": "10%",
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
         "raw_score": round(alignment * 100, 1),
         "weighted_score": round(f4 * 100, 1),
         "explanation": a_note
     })
 
-<<<<<<< HEAD
     # 5. Data Verification (40%) — THE KEY DIFFERENTIATOR
-=======
-    # 5. Data Verification (25%) — THE KEY DIFFERENTIATOR
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
     if db_ctx["found"]:
         dv = 1.0; dv_note = f"Response verified against database ({', '.join(db_ctx['lookups_performed'])})"
     elif db_ctx["errors"]:
         dv = 0.3; dv_note = f"ID provided but not found: {'; '.join(db_ctx['errors'])}"
     else:
         dv = 0.0; dv_note = "No database verification — no IDs provided in message"
-<<<<<<< HEAD
     f5 = dv * 0.40
     factors.append({
         "name": "Data Verification", "weight": "40%",
-=======
-    f5 = dv * 0.25
-    factors.append({
-        "name": "Data Verification", "weight": "25%",
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
         "raw_score": round(dv * 100, 1),
         "weighted_score": round(f5 * 100, 1),
         "explanation": dv_note
@@ -841,7 +743,6 @@ def chat():
         "handoff": handoff
     }
 
-<<<<<<< HEAD
     # ── Log interaction to DB ──
     interaction_id = log_interaction(
         session_id=session_id,
@@ -854,8 +755,6 @@ def chat():
     if interaction_id:
         result["interaction_id"] = interaction_id
 
-=======
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
     logger.info(f"[{session_id}] Intent={intent['primary_intent']} | Conf={confidence['score']}% | "
                 f"Sent={sentiment['label']} | DB={'✓' if db_ctx['found'] else '✗'} | IDs={ids}")
 
@@ -867,7 +766,6 @@ def feedback():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data"}), 400
-<<<<<<< HEAD
 
     interaction_id = data.get("interaction_id")
     rating = data.get("rating")
@@ -901,12 +799,7 @@ def retrain_feedback():
     return jsonify(json.loads(json.dumps({"candidates": candidates, "count": len(candidates)}, cls=CustomEncoder)))
 
 
-=======
-    logger.info(f"Feedback: {json.dumps(data)}")
-    return jsonify({"status": "recorded"})
 
-
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
 # ═══════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
