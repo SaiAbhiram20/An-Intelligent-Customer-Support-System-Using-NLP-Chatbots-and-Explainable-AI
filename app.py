@@ -1432,3 +1432,4 @@ if __name__ == '__main__':
     else:
         logger.warning("⚠️  Database not connected — running without data verification")
     app.run(host='0.0.0.0', port=port, debug=True)
+
