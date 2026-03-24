@@ -124,7 +124,6 @@ CREATE TRIGGER trg_transactions_updated
     BEFORE UPDATE ON transactions
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
-<<<<<<< HEAD
 -- ─── CHAT INTERACTIONS (Analytics + Feedback) ───────────────
 CREATE TABLE IF NOT EXISTS chat_interactions (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -146,46 +145,14 @@ CREATE TABLE IF NOT EXISTS feedback (
     created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-=======
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
 -- ─── INDEXES ─────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_order ON transactions(order_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(customer_id);
-<<<<<<< HEAD
 
--- ─── CHAT SESSIONS ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS chat_sessions (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id      VARCHAR(50) UNIQUE NOT NULL,
-    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- ─── CHAT INTERACTIONS ───────────────────────────────────────
-CREATE TABLE IF NOT EXISTS chat_interactions (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id          VARCHAR(50) NOT NULL REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
-    user_message        TEXT NOT NULL,
-    detected_intent     VARCHAR(50),
-    confidence_score    DECIMAL(5,2),
-    response_source     VARCHAR(50),
-    handoff_recommended BOOLEAN DEFAULT FALSE,
-    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- ─── FEEDBACK ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS feedback (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    interaction_id      UUID NOT NULL REFERENCES chat_interactions(id) ON DELETE CASCADE,
-    rating              INTEGER CHECK (rating >= 1 AND rating <= 5),
-    comment             TEXT,
-    retrain_flag        BOOLEAN DEFAULT FALSE,
-    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);CREATE INDEX IF NOT EXISTS idx_chat_interactions_session ON chat_interactions(session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_interactions_session ON chat_interactions(session_id);
 CREATE INDEX IF NOT EXISTS idx_chat_interactions_created ON chat_interactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_interaction ON feedback(interaction_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_retrain ON feedback(retrain_flag) WHERE retrain_flag = TRUE;
-=======
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48

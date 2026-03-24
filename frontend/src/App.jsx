@@ -217,7 +217,7 @@ const ConfidenceMeter = ({ score, level }) => {
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div style={{ position: "relative", width: 52, height: 52 }}>
         <svg width="52" height="52" viewBox="0 0 52 52">
-          <circle cx="26" cy="26" r="22" fill="none" stroke="#1e293b" strokeWidth="4" />
+          <circle cx="26" cy="26" r="22" fill="none" stroke="#1C1108" strokeWidth="4" />
           <circle cx="26" cy="26" r="22" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(score / 100) * 138.2} 138.2`} strokeLinecap="round"
             transform="rotate(-90 26 26)" style={{ transition: "stroke-dasharray 0.8s ease" }} />
@@ -228,7 +228,7 @@ const ConfidenceMeter = ({ score, level }) => {
       </div>
       <div>
         <div style={{ fontSize: 13, fontWeight: 600, color, textTransform: "uppercase", letterSpacing: 1 }}>{level}</div>
-        <div style={{ fontSize: 11, color: "#64748b" }}>confidence</div>
+        <div style={{ fontSize: 11, color: "#7A4A20" }}>confidence</div>
       </div>
     </div>
   );
@@ -239,13 +239,13 @@ const FactorBar = ({ factor }) => {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-        <span style={{ color: "#cbd5e1", fontWeight: 500 }}>{factor.name} <span style={{ color: "#475569" }}>({factor.weight})</span></span>
-        <span style={{ color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{factor.raw_score}%</span>
+        <span style={{ color: "#E8C49A", fontWeight: 500 }}>{factor.name} <span style={{ color: "#6B3D1E" }}>({factor.weight})</span></span>
+        <span style={{ color: "#C4884A", fontFamily: "'JetBrains Mono', monospace" }}>{factor.raw_score}%</span>
       </div>
-      <div style={{ height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 6, background: "#1C1108", borderRadius: 3, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#ef4444", borderRadius: 3, transition: "width 0.6s ease" }} />
       </div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{factor.explanation}</div>
+      <div style={{ fontSize: 11, color: "#7A4A20", marginTop: 2 }}>{factor.explanation}</div>
     </div>
   );
 };
@@ -255,7 +255,7 @@ const DataBadge = ({ meta }) => {
   const v = meta.data_verified;
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-      background: v ? "#052e16" : "#1e293b", border: `1px solid ${v ? "#16a34a" : "#334155"}`, color: v ? "#4ade80" : "#94a3b8" }}>
+      background: v ? "#052e16" : "#1C1108", border: `1px solid ${v ? "#16a34a" : "#3D1A08"}`, color: v ? "#4ade80" : "#C4884A" }}>
       {v ? "\u2713 DB Verified" : "\u25CB No DB Data"}
       {meta.source && <span style={{ opacity: 0.6 }}> &bull; {meta.source.replace(/_/g, " ")}</span>}
     </span>
@@ -267,39 +267,39 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
   const db = data.explainability?.database;
   return (
     <div style={{ marginTop: 8 }}>
-      <button onClick={toggle} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+      <button onClick={toggle} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#C4884A", fontSize: 12, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>&#x25B6;</span>
         {isOpen ? "Hide" : "Show"} AI Reasoning
       </button>
       {isOpen && (
-        <div style={{ marginTop: 10, padding: 16, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 10, animation: "fadeIn 0.3s ease" }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>Confidence Breakdown</h4>
+        <div style={{ marginTop: 10, padding: 16, background: "#140A05", border: "1px solid #1e293b", borderRadius: 10, animation: "fadeIn 0.3s ease" }}>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, color: "#FFF7ED", fontWeight: 600 }}>Confidence Breakdown</h4>
           {data.confidence.factors.map((f, i) => <FactorBar key={i} factor={f} />)}
 
           {db && db.lookups_performed?.length > 0 && (
-            <div style={{ marginBottom: 16, padding: 12, background: "#0a2540", border: "1px solid #1e3a5f", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Database Lookups</div>
-              {db.lookups_performed.map((l, i) => <div key={i} style={{ fontSize: 12, color: "#93c5fd", marginBottom: 2 }}>&bull; {l}</div>)}
+            <div style={{ marginBottom: 16, padding: 12, background: "#1A0800", border: "1px solid #1e3a5f", borderRadius: 8 }}>
+              <div style={{ fontSize: 12, color: "#FB923C", fontWeight: 600, marginBottom: 4 }}>Database Lookups</div>
+              {db.lookups_performed.map((l, i) => <div key={i} style={{ fontSize: 12, color: "#FDBA74", marginBottom: 2 }}>&bull; {l}</div>)}
               {db.ids_extracted && Object.keys(db.ids_extracted).length > 0 && (
-                <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>IDs: {JSON.stringify(db.ids_extracted)}</div>
+                <div style={{ fontSize: 11, color: "#6B3D1E", marginTop: 4 }}>IDs: {JSON.stringify(db.ids_extracted)}</div>
               )}
             </div>
           )}
 
-          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>Intent Analysis</h4>
+          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#FFF7ED", fontWeight: 600 }}>Intent Analysis</h4>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
             {data.explainability.intent.all_candidates.map((c, i) => (
-              <span key={i} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 12, background: i === 0 ? "#1e3a5f" : "#1e293b", border: `1px solid ${i === 0 ? "#3b82f6" : "#334155"}`, color: i === 0 ? "#93c5fd" : "#94a3b8" }}>
+              <span key={i} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 12, background: i === 0 ? "#3D1500" : "#1C1108", border: `1px solid ${i === 0 ? "#3b82f6" : "#3D1A08"}`, color: i === 0 ? "#FDBA74" : "#C4884A" }}>
                 {c.intent}: {(c.score * 100).toFixed(0)}%
               </span>
             ))}
           </div>
 
-          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>Sentiment</h4>
+          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#FFF7ED", fontWeight: 600 }}>Sentiment</h4>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
             background: data.explainability.sentiment.label === "positive" ? "#052e16" : data.explainability.sentiment.label === "negative" ? "#350a0a" : "#172554",
             border: `1px solid ${data.explainability.sentiment.label === "positive" ? "#16a34a" : data.explainability.sentiment.label === "negative" ? "#dc2626" : "#2563eb"}`,
-            color: data.explainability.sentiment.label === "positive" ? "#4ade80" : data.explainability.sentiment.label === "negative" ? "#f87171" : "#60a5fa" }}>
+            color: data.explainability.sentiment.label === "positive" ? "#4ade80" : data.explainability.sentiment.label === "negative" ? "#f87171" : "#FB923C" }}>
             {data.explainability.sentiment.label === "positive" ? "\u2191" : data.explainability.sentiment.label === "negative" ? "\u2193" : "\u2192"} {data.explainability.sentiment.label} ({data.explainability.sentiment.score})
           </span>
 
@@ -338,7 +338,7 @@ const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
 
   if (submitted) {
     return (
-      <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
+      <div style={{ marginTop: 6, fontSize: 12, color: "#7A4A20" }}>
         {submitted === "up" ? "\u{1F44D}" : "\u{1F44E}"} Feedback recorded — thank you!
       </div>
     );
@@ -346,12 +346,12 @@ const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
 
   return (
     <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center" }}>
-      <span style={{ fontSize: 11, color: "#475569" }}>Was this helpful?</span>
+      <span style={{ fontSize: 11, color: "#6B3D1E" }}>Was this helpful?</span>
       <button onClick={() => submit("up")}
-        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
+        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#C4884A", lineHeight: 1 }}
         title="Helpful">{"\u{1F44D}"}</button>
       <button onClick={() => submit("down")}
-        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
+        style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#C4884A", lineHeight: 1 }}
         title="Not helpful">{"\u{1F44E}"}</button>
     </div>
   );
@@ -363,8 +363,8 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 16, animation: "slideUp 0.3s ease" }}>
       <div style={{ maxWidth: "82%", minWidth: 120 }}>
         <div style={{ padding: "12px 16px", borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          background: isUser ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "#1e293b",
-          color: isUser ? "#fff" : "#e2e8f0", fontSize: 14, lineHeight: 1.6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+          background: isUser ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "#1C1108",
+          color: isUser ? "#fff" : "#FFF7ED", fontSize: 14, lineHeight: 1.6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
           {msg.text}
         </div>
         {!isUser && msg.apiData && (
@@ -373,7 +373,7 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
               <ConfidenceMeter score={msg.apiData.confidence.score} level={msg.apiData.confidence.level} />
               <DataBadge meta={msg.apiData.response_meta} />
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, maxWidth: 400 }}>{msg.apiData.confidence.description}</div>
+            <div style={{ fontSize: 12, color: "#7A4A20", marginTop: 4, maxWidth: 400 }}>{msg.apiData.confidence.description}</div>
             <FeedbackButtons interactionId={msg.apiData.interaction_id} useMock={useMock} />
           </div>
         )}
@@ -392,11 +392,11 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
 /* ═══════════════════════════════════════════════════════════════
    ANALYTICS DASHBOARD (Feature 5)
    ═══════════════════════════════════════════════════════════════ */
-const StatCard = ({ label, value, sub, color = "#e2e8f0" }) => (
-  <div style={{ flex: "1 1 180px", padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
-    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+const StatCard = ({ label, value, sub, color = "#FFF7ED" }) => (
+  <div style={{ flex: "1 1 180px", padding: 20, background: "#140A05", border: "1px solid #1e293b", borderRadius: 12 }}>
+    <div style={{ fontSize: 12, color: "#7A4A20", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
     <div style={{ fontSize: 28, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{sub}</div>}
+    {sub && <div style={{ fontSize: 11, color: "#6B3D1E", marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
@@ -405,17 +405,100 @@ const IntentBar = ({ intent, count, max }) => {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-        <span style={{ color: "#cbd5e1" }}>{intent}</span>
-        <span style={{ color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{count}</span>
+        <span style={{ color: "#E8C49A" }}>{intent}</span>
+        <span style={{ color: "#C4884A", fontFamily: "'JetBrains Mono', monospace" }}>{count}</span>
       </div>
-      <div style={{ height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 6, background: "#1C1108", borderRadius: 3, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", borderRadius: 3, transition: "width 0.6s ease" }} />
       </div>
     </div>
   );
 };
 
-const AnalyticsDashboard = ({ useMock }) => {
+/* ═══════════════════════════════════════════════════════════════
+   LOGIN PAGE
+   ═══════════════════════════════════════════════════════════════ */
+function LoginPage({ onSuccess }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onSuccess(data.token);
+      } else {
+        setError(data.error || "Invalid credentials");
+      }
+    } catch {
+      setError("Could not reach server. Make sure the backend is running.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0A0602", color: "#FFF7ED", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        input:focus { outline: none; }
+      `}</style>
+
+      <div style={{ animation: "slideUp 0.3s ease", width: "100%", maxWidth: 400, padding: "0 24px" }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 16px" }}>🤖</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Intelligent Support</div>
+          <div style={{ fontSize: 13, color: "#7A4A20", marginTop: 6 }}>Sign in to access the platform</div>
+        </div>
+
+        {/* Card */}
+        <div style={{ background: "#140A05", border: "1px solid #1e293b", borderRadius: 16, padding: 32 }}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#C4884A", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Username</div>
+              <input value={username} onChange={e => setUsername(e.target.value)} autoFocus required
+                placeholder="Enter your username"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #334155", background: "#1C1108", color: "#FFF7ED", fontSize: 14, fontFamily: "inherit" }} />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#C4884A", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Password</div>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                placeholder="Enter your password"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #334155", background: "#1C1108", color: "#FFF7ED", fontSize: 14, fontFamily: "inherit" }} />
+            </div>
+            {error && (
+              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 20 }}>
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={loading}
+              style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: loading ? "#1C1108" : "linear-gradient(135deg, #2563eb, #7c3aed)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: loading ? "default" : "pointer", letterSpacing: -0.2 }}>
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
+          </form>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#3D1A08" }}>
+          NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
   const [data, setData] = useState(null);
   const [retrain, setRetrain] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -469,10 +552,12 @@ const AnalyticsDashboard = ({ useMock }) => {
       return;
     }
     try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const [analyticsRes, retrainRes] = await Promise.all([
-        fetch(`${API_URL}/analytics`),
-        fetch(`${API_URL}/retrain_feedback`)
+        fetch(`${API_URL}/analytics`, { headers }),
+        fetch(`${API_URL}/retrain_feedback`, { headers })
       ]);
+      if (analyticsRes.status === 401) { onAuthError(); return; }
       if (!analyticsRes.ok) throw new Error("Analytics endpoint unavailable");
       setData(await analyticsRes.json());
       if (retrainRes.ok) setRetrain(await retrainRes.json());
@@ -480,13 +565,13 @@ const AnalyticsDashboard = ({ useMock }) => {
       setError(e.message);
     }
     setLoading(false);
-  }, [useMock]);
+  }, [useMock, token, onAuthError]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {
     return (
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#7A4A20" }}>
         Loading analytics...
       </div>
     );
@@ -495,7 +580,7 @@ const AnalyticsDashboard = ({ useMock }) => {
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#f87171" }}>
         <div>{error}</div>
-        <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", cursor: "pointer", fontSize: 13 }}>Retry</button>
+        <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "#1C1108", color: "#FFF7ED", cursor: "pointer", fontSize: 13 }}>Retry</button>
       </div>
     );
   }
@@ -516,22 +601,22 @@ const AnalyticsDashboard = ({ useMock }) => {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Intent Distribution */}
-        <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
-          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Query Trends (Top Intents)</h3>
+        <div style={{ padding: 20, background: "#140A05", border: "1px solid #1e293b", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#FFF7ED" }}>Query Trends (Top Intents)</h3>
           {data.intent_distribution.map((d, i) => (
             <IntentBar key={i} intent={d.detected_intent} count={d.cnt} max={maxIntent} />
           ))}
         </div>
 
         {/* Daily Volume Chart */}
-        <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12 }}>
-          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Daily Query Volume</h3>
+        <div style={{ padding: 20, background: "#140A05", border: "1px solid #1e293b", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#FFF7ED" }}>Daily Query Volume</h3>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 140 }}>
             {data.daily_volume.map((d, i) => (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
+                <div style={{ fontSize: 10, color: "#C4884A", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
                 <div style={{ width: "100%", background: "linear-gradient(180deg, #3b82f6, #1e40af)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4 }} />
-                <div style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
+                <div style={{ fontSize: 9, color: "#6B3D1E", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
               </div>
             ))}
           </div>
@@ -539,14 +624,14 @@ const AnalyticsDashboard = ({ useMock }) => {
       </div>
 
       {/* Recent Feedback */}
-      <div style={{ padding: 20, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>Recent Feedback</h3>
+      <div style={{ padding: 20, background: "#140A05", border: "1px solid #1e293b", borderRadius: 12, marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#FFF7ED" }}>Recent Feedback</h3>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #1e293b" }}>
                 {["Rating", "User Message", "Intent", "Confidence", "Comment", "Time"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", color: "#64748b", fontWeight: 500 }}>{h}</th>
+                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", color: "#7A4A20", fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -556,15 +641,15 @@ const AnalyticsDashboard = ({ useMock }) => {
                   <td style={{ padding: "8px 10px" }}>
                     <span style={{ display: "inline-block", width: 28, textAlign: "center", padding: "2px 0", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
                       background: fb.rating >= 4 ? "#052e16" : fb.rating <= 2 ? "#350a0a" : "#172554",
-                      color: fb.rating >= 4 ? "#4ade80" : fb.rating <= 2 ? "#f87171" : "#60a5fa" }}>
+                      color: fb.rating >= 4 ? "#4ade80" : fb.rating <= 2 ? "#f87171" : "#FB923C" }}>
                       {fb.rating}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#cbd5e1", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fb.user_message}</td>
-                  <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{fb.detected_intent}</td>
-                  <td style={{ padding: "8px 10px", color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{fb.confidence_score}%</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontStyle: fb.comment ? "normal" : "italic" }}>{fb.comment || "—"}</td>
-                  <td style={{ padding: "8px 10px", color: "#475569", whiteSpace: "nowrap" }}>{fb.created_at ? new Date(fb.created_at).toLocaleString() : "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "#E8C49A", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fb.user_message}</td>
+                  <td style={{ padding: "8px 10px", color: "#C4884A" }}>{fb.detected_intent}</td>
+                  <td style={{ padding: "8px 10px", color: "#C4884A", fontFamily: "'JetBrains Mono', monospace" }}>{fb.confidence_score}%</td>
+                  <td style={{ padding: "8px 10px", color: "#7A4A20", fontStyle: fb.comment ? "normal" : "italic" }}>{fb.comment || "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "#6B3D1E", whiteSpace: "nowrap" }}>{fb.created_at ? new Date(fb.created_at).toLocaleString() : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -578,17 +663,17 @@ const AnalyticsDashboard = ({ useMock }) => {
           <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#fbbf24" }}>Needs Retraining ({retrain.count})</h3>
           <p style={{ margin: "0 0 14px", fontSize: 12, color: "#a16207" }}>These interactions received poor ratings and are flagged for NLP improvement.</p>
           {retrain.candidates.map((c, i) => (
-            <div key={i} style={{ padding: 12, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8, marginBottom: 8 }}>
+            <div key={i} style={{ padding: 12, background: "#140A05", border: "1px solid #1e293b", borderRadius: 8, marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500 }}>"{c.user_message}"</span>
+                <span style={{ fontSize: 12, color: "#FFF7ED", fontWeight: 500 }}>"{c.user_message}"</span>
                 <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#350a0a", color: "#f87171", fontWeight: 600 }}>
                   Rating: {c.rating}/5
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b" }}>
-                <span>Intent: <strong style={{ color: "#94a3b8" }}>{c.detected_intent}</strong></span>
-                <span>Confidence: <strong style={{ color: "#94a3b8" }}>{c.confidence_score}%</strong></span>
-                <span>Source: <strong style={{ color: "#94a3b8" }}>{c.response_source}</strong></span>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#7A4A20" }}>
+                <span>Intent: <strong style={{ color: "#C4884A" }}>{c.detected_intent}</strong></span>
+                <span>Confidence: <strong style={{ color: "#C4884A" }}>{c.confidence_score}%</strong></span>
+                <span>Source: <strong style={{ color: "#C4884A" }}>{c.response_source}</strong></span>
               </div>
               {c.comment && <div style={{ marginTop: 4, fontSize: 11, color: "#a16207", fontStyle: "italic" }}>"{c.comment}"</div>}
             </div>
@@ -611,7 +696,25 @@ export default function App() {
   const [explainStates, setExplainStates] = useState({});
   const [useMock, setUseMock] = useState(true);
   const [view, setView] = useState("chat"); // "chat" | "dashboard"
+  const [token, setToken] = useState(() => localStorage.getItem("admin_token") || null);
+  const isAuthenticated = !!token;
   const bottomRef = useRef(null);
+
+  function handleLoginSuccess(newToken) {
+    localStorage.setItem("admin_token", newToken);
+    setToken(newToken);
+    setView("chat");
+  }
+  function handleLogout() {
+    localStorage.removeItem("admin_token");
+    setToken(null);
+  }
+  function handleAuthError() {
+    localStorage.removeItem("admin_token");
+    setToken(null);
+  }
+
+  if (!isAuthenticated) return <LoginPage onSuccess={handleLoginSuccess} />;
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -649,7 +752,7 @@ export default function App() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "#0A0602", color: "#FFF7ED", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -666,24 +769,30 @@ export default function App() {
           <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{"\u{1F916}"}</div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>Intelligent Support</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI</div>
+            <div style={{ fontSize: 11, color: "#7A4A20" }}>NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {/* View Toggle */}
-          <div style={{ display: "flex", background: "#1e293b", borderRadius: 8, overflow: "hidden", border: "1px solid #334155" }}>
+          <div style={{ display: "flex", background: "#1C1108", borderRadius: 8, overflow: "hidden", border: "1px solid #334155" }}>
             <button onClick={() => setView("chat")}
               style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "chat" ? "#3b82f6" : "transparent", color: view === "chat" ? "#fff" : "#64748b" }}>
+                background: view === "chat" ? "#3b82f6" : "transparent", color: view === "chat" ? "#fff" : "#7A4A20" }}>
               Chat
             </button>
             <button onClick={() => setView("dashboard")}
               style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "dashboard" ? "#3b82f6" : "transparent", color: view === "dashboard" ? "#fff" : "#64748b" }}>
+                background: view === "dashboard" ? "#3b82f6" : "transparent", color: view === "dashboard" ? "#fff" : "#7A4A20" }}>
               Dashboard
             </button>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
+          {isAuthenticated && (
+            <button onClick={handleLogout}
+              style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #334155", background: "transparent", color: "#C4884A", cursor: "pointer" }}>
+              Logout
+            </button>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#7A4A20", cursor: "pointer" }}>
             <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "#3b82f6" }} />
             Live API
           </label>
@@ -695,7 +804,7 @@ export default function App() {
           {/* Quick Prompts */}
           <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid #0f172a" }}>
             {quickPrompts.map((p, i) => (
-              <button key={i} onClick={() => setInput(p)} style={{ whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 20, border: "1px solid #1e293b", background: "#0f172a", color: "#94a3b8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>{p}</button>
+              <button key={i} onClick={() => setInput(p)} style={{ whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 20, border: "1px solid #1e293b", background: "#140A05", color: "#C4884A", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>{p}</button>
             ))}
           </div>
 
@@ -713,24 +822,25 @@ export default function App() {
           </div>
 
           {/* Input */}
-          <div style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", background: "#0f172a" }}>
+          <div style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", background: "#140A05" }}>
             <div style={{ display: "flex", gap: 10, maxWidth: 800, margin: "0 auto" }}>
               <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
                 placeholder="Ask about an order (ORD-100001), customer (CUST-001001), or describe your issue..."
-                style={{ flex: 1, padding: "12px 18px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontSize: 14, fontFamily: "inherit" }} />
+                style={{ flex: 1, padding: "12px 18px", borderRadius: 12, border: "1px solid #334155", background: "#1C1108", color: "#FFF7ED", fontSize: 14, fontFamily: "inherit" }} />
               <button onClick={send} disabled={loading || !input.trim()}
-                style={{ padding: "12px 24px", borderRadius: 12, border: "none", background: loading || !input.trim() ? "#1e293b" : "linear-gradient(135deg, #2563eb, #7c3aed)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer" }}>
+                style={{ padding: "12px 24px", borderRadius: 12, border: "none", background: loading || !input.trim() ? "#1C1108" : "linear-gradient(135deg, #2563eb, #7c3aed)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer" }}>
                 Send
               </button>
             </div>
-            <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#475569" }}>
+            <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#6B3D1E" }}>
               Transparent Confidence Scoring &bull; Database Verified Responses &bull; Click "Show AI Reasoning" for full breakdown
             </div>
           </div>
         </>
       ) : (
-        <AnalyticsDashboard useMock={useMock} />
+        <AnalyticsDashboard useMock={useMock} token={token} onAuthError={handleAuthError} />
       )}
+
     </div>
   );
 }

@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m pytest test_app.py -v)"
+      "Bash(python -m pytest test_app.py -v)",
+      "Bash(python -c \"import app\")",
+      "Bash(.venvScriptspip.exe uninstall:*)",
+      "Bash(.venvScriptspip.exe install:*)"
     ]
   }
 }

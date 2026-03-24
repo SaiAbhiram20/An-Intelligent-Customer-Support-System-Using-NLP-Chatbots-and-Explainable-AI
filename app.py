@@ -13,7 +13,9 @@ import re
 import json
 import uuid
 import logging
-from datetime import datetime, date
+import jwt
+from functools import wraps
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -55,6 +57,27 @@ class CustomEncoder(json.JSONEncoder):
         return super().default(o)
 
 app.json_encoder = CustomEncoder
+
+
+# ═══════════════════════════════════════════════════════════════
+# AUTH
+# ═══════════════════════════════════════════════════════════════
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid token"}), 401
+        token = auth_header.split(" ", 1)[1]
+        try:
+            jwt.decode(token, os.environ["JWT_SECRET_KEY"], algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -787,7 +810,26 @@ def feedback():
     return jsonify({"status": "recorded"})
 
 
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No credentials provided"}), 400
+    username = data.get("username", "")
+    password = data.get("password", "")
+    if (username == os.environ.get("ADMIN_USERNAME") and
+            password == os.environ.get("ADMIN_PASSWORD")):
+        token = jwt.encode(
+            {"sub": username, "exp": datetime.utcnow() + timedelta(hours=8)},
+            os.environ["JWT_SECRET_KEY"],
+            algorithm="HS256"
+        )
+        return jsonify({"token": token})
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
 @app.route('/api/analytics', methods=['GET'])
+@token_required
 def analytics():
     data = get_analytics_data()
     if data is None:
@@ -796,6 +838,7 @@ def analytics():
 
 
 @app.route('/api/retrain_feedback', methods=['GET'])
+@token_required
 def retrain_feedback():
     limit = request.args.get('limit', 20, type=int)
     candidates = get_retrain_candidates(limit)
