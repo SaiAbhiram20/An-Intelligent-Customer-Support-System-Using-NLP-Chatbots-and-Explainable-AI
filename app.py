@@ -418,7 +418,6 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
     # ── TRANSACTION-BASED RESPONSES ──
     if transaction and not order:
-        name = transaction.get("first_name", "there")
         data_used.append(f"transaction:{transaction['transaction_id']}")
         data_verified = True
 
@@ -429,7 +428,7 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             refund_note = " This transaction has already been refunded."
 
         return {
-            "text": f"{empathy}Hi {name}! I found transaction {transaction['transaction_id']}. "
+            "text": f"{empathy}Transaction {transaction['transaction_id']} found. "
                     f"Type: {transaction['type']} | Status: {transaction['status']} | "
                     f"Amount: ${transaction['amount']} | Payment: {transaction.get('payment_method', 'N/A')} | "
                     f"Date: {transaction['transaction_date']}.{refund_note} "
@@ -439,11 +438,10 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
     # ── CUSTOMER-BASED RESPONSES ──
     if customer:
-        name = customer.get("first_name", "there")
         data_used.append(f"customer:{customer['customer_id']}")
         data_verified = True
 
-        parts = [f"{empathy}Hi {name}! I've pulled up your account ({customer['customer_id']})."]
+        parts = [f"{empathy}Account {customer['customer_id']} found."]
 
         if customer_orders:
             recent = customer_orders[:3]
@@ -468,12 +466,11 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
     # ── SUBSCRIPTION-BASED RESPONSES ──
     if subscription:
-        name = subscription.get("first_name", "there")
         data_used.append(f"subscription:{subscription['subscription_id']}")
         data_verified = True
 
         return {
-            "text": f"{empathy}Hi {name}! Your subscription {subscription['subscription_id']}: "
+            "text": f"{empathy}Subscription {subscription['subscription_id']}: "
                     f"{subscription['plan_name'].upper()} plan at ${subscription['plan_price']}/{subscription['billing_cycle']}. "
                     f"Status: {subscription['status']}. Current period: {subscription.get('current_period_start')} to {subscription.get('current_period_end')}. "
                     f"{'Auto-renewal is ON.' if subscription.get('auto_renew') else 'Auto-renewal is OFF.'} "
