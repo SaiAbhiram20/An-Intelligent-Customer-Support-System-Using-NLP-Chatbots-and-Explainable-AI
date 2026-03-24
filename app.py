@@ -559,8 +559,13 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
     # 2. Intent Clarity (10%)
     all_i = intent.get("all_intents", [])
-    clarity = (all_i[0]["score"] - all_i[1]["score"]) if len(all_i) >= 2 else (all_i[0]["score"] if all_i else 0)
-    clarity = min(clarity * 2, 1.0)
+    if len(all_i) >= 2:
+        top, second = all_i[0]["score"], all_i[1]["score"]
+        clarity = (top - second) / top if top > 0 else 0.0
+    elif all_i:
+        clarity = 1.0  # only one intent matched — unambiguous
+    else:
+        clarity = 0.0
     f2 = clarity * 0.10
     factors.append({
         "name": "Intent Clarity", "weight": "10%",
@@ -571,20 +576,20 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
     # 3. Query Specificity (15%)
     tc = proc["token_count"]
-    spec = 0.3 if tc <= 2 else (0.6 if tc <= 5 else (0.9 if tc <= 15 else 1.0))
+    spec = round(min(1.0, tc ** 0.5 / 4.0), 3)
     f3 = spec * 0.15
-    spec_note = {0.3: "Very short query", 0.6: "Moderate detail", 0.9: "Good detail", 1.0: "Rich context"}
+    spec_label = "Very short" if tc <= 2 else ("Moderate" if tc <= 6 else ("Detailed" if tc <= 14 else "Rich context"))
     factors.append({
         "name": "Query Specificity", "weight": "15%",
         "raw_score": round(spec * 100, 1),
         "weighted_score": round(f3 * 100, 1),
-        "explanation": f"{spec_note.get(spec, '')} ({tc} tokens)"
+        "explanation": f"{spec_label} ({tc} tokens)"
     })
 
     # 4. Sentiment Alignment (15%)
     primary = intent["primary_intent"]
     sl = sentiment["label"]
-    if primary in ("technical","shipping","refund") and sl == "negative":
+    if primary in ("technical","shipping","refund","billing","account","order_status","subscription") and sl == "negative":
         alignment = 0.9; a_note = "Negative sentiment aligns with support request"
     elif primary in ("greeting","thanks","farewell") and sl in ("positive","neutral"):
         alignment = 0.9; a_note = "Positive/neutral sentiment fits this interaction"

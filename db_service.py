@@ -239,7 +239,6 @@ def get_subscription_by_customer(customer_id: str) -> Optional[Dict]:
 # REFUND ELIGIBILITY CHECK
 # ═══════════════════════════════════════════════════════════════
 
-<<<<<<< HEAD
 # ═══════════════════════════════════════════════════════════════
 # ANALYTICS & FEEDBACK
 # ═══════════════════════════════════════════════════════════════
@@ -362,8 +361,6 @@ def get_retrain_candidates(limit: int = 20) -> Optional[List[Dict]]:
 # REFUND ELIGIBILITY CHECK
 # ═══════════════════════════════════════════════════════════════
 
-=======
->>>>>>> 6f1e271be1e759659aea23f43cf22802aa106a48
 @db_operation
 def check_refund_eligibility(order_id: str) -> Optional[Dict]:
     """Check if an order qualifies for refund based on status, date, and policy."""

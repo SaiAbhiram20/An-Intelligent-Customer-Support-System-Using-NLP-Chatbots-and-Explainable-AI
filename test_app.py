@@ -172,7 +172,40 @@ class TestConfidenceScoring:
 
     def test_missing_info_suggestions(self):
         c = compute_confidence(self._make_intent("order_status", 0.4), self._make_sentiment(), preprocess("order status"), {"found": False, "entities": {}, "lookups_performed": [], "errors": []})
-        assert any("order ID" in m.lower() for m in c["missing_information"])
+        assert any("order id" in m.lower() for m in c["missing_information"])
+
+    def test_specificity_is_smooth(self):
+        """3-token query should score strictly between 1-token and 10-token."""
+        intent = self._make_intent("order_status", 0.5)
+        sent = self._make_sentiment()
+        db = {"found": False, "entities": {}, "lookups_performed": [], "errors": []}
+        c1  = compute_confidence(intent, sent, preprocess("help"), db)
+        c3  = compute_confidence(intent, sent, preprocess("where is order"), db)
+        c10 = compute_confidence(intent, sent, preprocess("I need to know where my order is right now"), db)
+        spec1  = next(f for f in c1["factors"]  if f["name"] == "Query Specificity")["raw_score"]
+        spec3  = next(f for f in c3["factors"]  if f["name"] == "Query Specificity")["raw_score"]
+        spec10 = next(f for f in c10["factors"] if f["name"] == "Query Specificity")["raw_score"]
+        assert spec1 < spec3 < spec10
+
+    def test_billing_negative_aligns(self):
+        """Negative sentiment on billing intent should score 0.9 alignment (90.0 raw)."""
+        intent = self._make_intent("billing", 0.6)
+        sent = self._make_sentiment("negative")
+        db = {"found": False, "entities": {}, "lookups_performed": [], "errors": []}
+        c = compute_confidence(intent, sent, preprocess("I was overcharged"), db)
+        alignment_factor = next(f for f in c["factors"] if f["name"] == "Sentiment Alignment")
+        assert alignment_factor["raw_score"] == 90.0
+
+    def test_clarity_single_intent_is_full(self):
+        """When only one intent fires, clarity should be 100.0."""
+        intent = {"primary_intent": "refund", "confidence": 0.8,
+                  "all_intents": [{"intent": "refund", "score": 0.8}],
+                  "matched_keywords": {"refund": ["refund"]}, "explanations": []}
+        sent = self._make_sentiment()
+        db = {"found": False, "entities": {}, "lookups_performed": [], "errors": []}
+        c = compute_confidence(intent, sent, preprocess("I need a refund"), db)
+        clarity_factor = next(f for f in c["factors"] if f["name"] == "Intent Clarity")
+        assert clarity_factor["raw_score"] == 100.0
 
 
 class TestAPI:
