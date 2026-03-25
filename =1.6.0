@@ -1,0 +1,100 @@
+Collecting transformers==4.41.0
+  Using cached transformers-4.41.0-py3-none-any.whl.metadata (43 kB)
+Collecting torch>=2.6.0
+  Using cached torch-2.11.0-cp313-cp313-win_amd64.whl.metadata (29 kB)
+Collecting datasets==2.19.0
+  Using cached datasets-2.19.0-py3-none-any.whl.metadata (19 kB)
+Collecting evaluate==0.4.2
+  Using cached evaluate-0.4.2-py3-none-any.whl.metadata (9.3 kB)
+Collecting accelerate==0.30.0
+  Using cached accelerate-0.30.0-py3-none-any.whl.metadata (19 kB)
+Collecting scikit-learn
+  Using cached scikit_learn-1.8.0-cp313-cp313-win_amd64.whl.metadata (11 kB)
+Collecting filelock (from transformers==4.41.0)
+  Downloading filelock-3.25.2-py3-none-any.whl.metadata (2.0 kB)
+Collecting huggingface-hub<1.0,>=0.23.0 (from transformers==4.41.0)
+  Downloading huggingface_hub-0.36.2-py3-none-any.whl.metadata (15 kB)
+Collecting numpy>=1.17 (from transformers==4.41.0)
+  Using cached numpy-2.4.3-cp313-cp313-win_amd64.whl.metadata (6.6 kB)
+Requirement already satisfied: packaging>=20.0 in c:\users\user\downloads\ase\venv\lib\site-packages (from transformers==4.41.0) (26.0)
+Collecting pyyaml>=5.1 (from transformers==4.41.0)
+  Using cached pyyaml-6.0.3-cp313-cp313-win_amd64.whl.metadata (2.4 kB)
+Collecting regex!=2019.12.17 (from transformers==4.41.0)
+  Downloading regex-2026.2.28-cp313-cp313-win_amd64.whl.metadata (41 kB)
+Collecting requests (from transformers==4.41.0)
+  Using cached requests-2.32.5-py3-none-any.whl.metadata (4.9 kB)
+Collecting tokenizers<0.20,>=0.19 (from transformers==4.41.0)
+  Downloading tokenizers-0.19.1.tar.gz (321 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  Preparing metadata (pyproject.toml) did not run successfully.
+  exit code: 1
+  
+  [45 lines of output]
+  Python reports SOABI: cp313-win_amd64
+  Computed rustc target triple: x86_64-pc-windows-msvc
+  Installation directory: C:\Users\user\AppData\Local\puccinialin\puccinialin\Cache
+  Downloading rustup-init from https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe
+  Checking for Rust toolchain....
+  Rust not found, installing into a temporary directory
+  
+  Downloading rustup-init:   0%|          | 0.00/12.8M [00:00<?, ?B/s]
+  Downloading rustup-init:   4%|3         | 475k/12.8M [00:00<00:02, 4.62MB/s]
+  Downloading rustup-init:   9%|8         | 1.12M/12.8M [00:00<00:02, 5.60MB/s]
+  Downloading rustup-init:  13%|#3        | 1.69M/12.8M [00:00<00:03, 3.51MB/s]
+  Downloading rustup-init:  17%|#7        | 2.22M/12.8M [00:00<00:02, 4.03MB/s]
+  Downloading rustup-init:  22%|##2       | 2.86M/12.8M [00:00<00:02, 4.65MB/s]
+  Downloading rustup-init:  28%|##7       | 3.56M/12.8M [00:00<00:01, 5.30MB/s]
+  Downloading rustup-init:  33%|###2      | 4.21M/12.8M [00:00<00:01, 5.63MB/s]
+  Downloading rustup-init:  38%|###8      | 4.91M/12.8M [00:00<00:01, 6.01MB/s]
+  Downloading rustup-init:  43%|####3     | 5.54M/12.8M [00:01<00:01, 5.89MB/s]
+  Downloading rustup-init:  49%|####8     | 6.27M/12.8M [00:01<00:01, 6.28MB/s]
+  Downloading rustup-init:  55%|#####4    | 6.99M/12.8M [00:01<00:00, 6.39MB/s]
+  Downloading rustup-init:  60%|#####9    | 7.67M/12.8M [00:01<00:00, 6.45MB/s]
+  Downloading rustup-init:  66%|######5   | 8.41M/12.8M [00:01<00:00, 6.71MB/s]
+  Downloading rustup-init:  71%|#######1  | 9.10M/12.8M [00:01<00:00, 6.73MB/s]
+  Downloading rustup-init:  76%|#######6  | 9.78M/12.8M [00:01<00:00, 6.69MB/s]
+  Downloading rustup-init:  83%|########2 | 10.6M/12.8M [00:01<00:00, 6.59MB/s]
+  Downloading rustup-init:  89%|########8 | 11.4M/12.8M [00:01<00:00, 7.00MB/s]
+  Downloading rustup-init:  95%|#########5| 12.2M/12.8M [00:02<00:00, 7.24MB/s]
+  Downloading rustup-init: 100%|##########| 12.8M/12.8M [00:02<00:00, 6.02MB/s]
+  Installing rust to C:\Users\user\AppData\Local\puccinialin\puccinialin\Cache\rustup
+  warn: It looks like you have an existing rustup settings file at:
+  warn: C:\Users\user\.rustup\settings.toml
+  warn: Rustup will install the default toolchain as specified in the settings file,
+  warn: instead of the one inferred from the default host triple.
+  info: profile set to minimal
+  info: default host triple is x86_64-pc-windows-msvc
+  info: syncing channel updates for stable-x86_64-pc-windows-msvc
+  info: latest update on 2026-03-05 for version 1.94.0 (4a4ef493e 2026-03-02)
+  info: downloading 3 components
+  info: default toolchain set to stable-x86_64-pc-windows-msvc
+  Checking if cargo is installed
+  cargo 1.94.0 (85eff7c80 2026-01-15)
+  
+  Cargo, the Rust package manager, is not installed or is not on PATH.
+  This package requires Rust and Cargo to compile extensions. Install it through
+  the system's package manager or via https://rustup.rs/
+  
+  [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+
+[notice] A new release of pip is available: 25.2 -> 26.0.1
+[notice] To update, run: C:\Users\user\Downloads\ASE\venv\Scripts\python.exe -m pip install --upgrade pip
+error: metadata-generation-failed
+
+Encountered error while generating package metadata.
+
+See above for output.
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.
