@@ -58,6 +58,13 @@ function mockAPI(message, chatHistory = []) {
     }
   }
 
+  // Build context string from recent history for multi-turn flow detection
+  const historyText = chatHistory.slice(-6).map(m => m.text || "").join(" ").toLowerCase();
+  const CONFIRMATION_WORDS = ["yes", "sure", "proceed", "confirm", "ok", "okay", "do it", "go ahead", "please", "yep", "yeah"];
+  const REFUND_WORDS = ["refund", "money back", "reimburse", "return"];
+  const isConfirmation = CONFIRMATION_WORDS.some(w => lower.includes(w));
+  const inRefundFlow   = REFUND_WORDS.some(w => lower.includes(w)) || REFUND_WORDS.some(w => historyText.includes(w));
+
   // Sentiment
   const negW = ["terrible","awful","frustrated","angry","hate","worst","horrible","furious","broken","useless","disappointed"];
   const posW = ["great","amazing","thanks","wonderful","happy","love","excellent","perfect","appreciate"];
@@ -108,6 +115,20 @@ function mockAPI(message, chatHistory = []) {
   if (ids.customer_id && !customer) dbErrors.push(`Customer ${ids.customer_id} not found.`);
   if (ids.transaction_id && !transaction) dbErrors.push(`Transaction ${ids.transaction_id} not found.`);
 
+  // Conversational bypass — takes priority over any active DB context
+  const CONVERSATIONAL_PHRASES = ["thank you", "thanks", "bye", "goodbye", "that's all", "that is all", "nothing else", "all good"];
+  const isConversational = ["greeting", "thanks", "farewell"].includes(bestIntent) ||
+    CONVERSATIONAL_PHRASES.some(ph => lower.includes(ph));
+  if (isConversational) {
+    if (bestIntent === "greeting" || ["hello", "hi", "hey"].some(w => lower.includes(w))) {
+      return { response: "Hello! I'm your AI support assistant. Share an order ID (ORD-100001), customer ID (CUST-001001), or describe your issue!", intent: { primary_intent: "greeting" }, sentiment: { label: "neutral", score: 0.5 }, source: "greeting", confidence: { score: 85 }, handoff: { recommended: false } };
+    }
+    if (bestIntent === "farewell" || ["bye", "goodbye", "that's all", "that is all", "nothing else"].some(w => lower.includes(w))) {
+      return { response: "Goodbye! Don't hesitate to reach out if you need anything. Take care!", intent: { primary_intent: "farewell" }, sentiment: { label: "neutral", score: 0.5 }, source: "farewell", confidence: { score: 85 }, handoff: { recommended: false } };
+    }
+    return { response: "You're welcome! Let me know if you need help with anything else.", intent: { primary_intent: "thanks" }, sentiment: { label: "positive", score: 0.6 }, source: "thanks", confidence: { score: 85 }, handoff: { recommended: false } };
+  }
+
   // Build genuine response from data
   if (dbErrors.length > 0) {
     responseText = `${empathy}${dbErrors.join(" ")} Could you double-check the ID?`;
@@ -115,15 +136,23 @@ function mockAPI(message, chatHistory = []) {
   } else if (order) {
     dbFound = true; dataVerified = true; dataUsed.push(`order:${order.order_id}`);
     const items = order.items.map(i => i.product_name).join(", ");
-    const isRefund = ["refund", "money back", "reimburse", "return"].some(w => lower.includes(w));
+    const isRefund = REFUND_WORDS.some(w => lower.includes(w));
 
-    if (isRefund && order.transaction) {
-      if (order.transaction.refund_eligible) {
-        responseText = `${empathy}Order ${order.order_id} is eligible for a full refund of $${order.total}. It will be processed to your ${order.transaction.payment_method} within 5-7 business days. Items: ${items}. Proceed?`;
-        source = "db_refund_eligible";
-      } else {
+    if (isRefund || (isConfirmation && inRefundFlow)) {
+      if (order.transaction && order.transaction.refund_eligible) {
+        if (isConfirmation && inRefundFlow) {
+          responseText = `${empathy}Your refund of $${order.total} for order ${order.order_id} has been successfully initiated. It will be returned to your ${order.transaction.payment_method} within 5-7 business days. You'll receive a confirmation email shortly. Is there anything else I can help with?`;
+          source = "db_refund_processed";
+        } else {
+          responseText = `${empathy}Order ${order.order_id} is eligible for a full refund of $${order.total}. It will be processed to your ${order.transaction.payment_method} within 5-7 business days. Items: ${items}. Would you like me to proceed with the refund?`;
+          source = "db_refund_eligible";
+        }
+      } else if (order.transaction && !order.transaction.refund_eligible) {
         responseText = `${empathy}Order ${order.order_id} is outside the 30-day refund window (deadline: ${order.transaction.refund_deadline}). Total: $${order.total}. Items: ${items}. Want me to connect you with a specialist?`;
         source = "db_refund_ineligible";
+      } else {
+        responseText = `${empathy}I understand you'd like a refund for order ${order.order_id}, but I was unable to locate the original transaction to verify eligibility. Let me connect you with a specialist who can process this directly.`;
+        source = "db_refund_no_transaction";
       }
     } else if (order.status === "delivered") {
       responseText = `${empathy}Order ${order.order_id} was delivered on ${order.delivered_date}. Items: ${items}. Total: $${order.total}. Anything else about this order?`;
@@ -150,11 +179,16 @@ function mockAPI(message, chatHistory = []) {
   } else if (transaction) {
     dbFound = true; dataVerified = true; dataUsed.push(`txn:${transaction.transaction_id}`);
     const isRefundIntent = ["refund", "billing"].includes(bestIntent) ||
-      ["refund", "money back", "reimburse", "return", "back"].some(w => lower.includes(w));
-    if (isRefundIntent) {
+      REFUND_WORDS.some(w => lower.includes(w));
+    if (isRefundIntent || (isConfirmation && inRefundFlow)) {
       if (transaction.refund_eligible) {
-        responseText = `${empathy}Transaction ${transaction.transaction_id} is eligible for a refund of $${transaction.amount}. The refund will be processed to your ${transaction.payment_method} within 5-7 business days (deadline: ${transaction.refund_deadline}). Would you like me to initiate it?`;
-        source = "db_txn_refund_eligible";
+        if (isConfirmation && inRefundFlow) {
+          responseText = `${empathy}Your refund of $${transaction.amount} for transaction ${transaction.transaction_id} has been successfully initiated. It will be returned to your ${transaction.payment_method} within 5-7 business days. You'll receive a confirmation email shortly. Is there anything else I can help with?`;
+          source = "db_txn_refund_processed";
+        } else {
+          responseText = `${empathy}Transaction ${transaction.transaction_id} is eligible for a refund of $${transaction.amount}. The refund will be processed to your ${transaction.payment_method} within 5-7 business days (deadline: ${transaction.refund_deadline}). Would you like me to initiate it?`;
+          source = "db_txn_refund_eligible";
+        }
       } else if (transaction.status === "refunded") {
         responseText = `${empathy}Transaction ${transaction.transaction_id} has already been fully refunded. The $${transaction.amount} should be back on your ${transaction.payment_method}. Anything else I can help with?`;
         source = "db_txn_already_refunded";

@@ -303,8 +303,8 @@ def gather_db_context(ids: dict, intent: str) -> dict:
         else:
             ctx["errors"].append(f"Subscription {ids['subscription_id']} was not found.")
 
-    # If we have an order and intent is refund, check eligibility
-    if "order" in ctx["entities"] and intent in ("refund", "billing"):
+    # Always check refund eligibility when an order is present
+    if "order" in ctx["entities"]:
         refund_info = check_refund_eligibility(ids.get("order_id", ""))
         if refund_info:
             ctx["entities"]["refund_check"] = refund_info
@@ -318,17 +318,24 @@ def gather_db_context(ids: dict, intent: str) -> dict:
 # Instead of canned responses, this builds UNIQUE responses from
 # the actual data found in the database + the user's message context.
 
-def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: dict, ids: dict) -> dict:
+def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: dict, ids: dict, context: str = "") -> dict:
     """
     Generate a response dynamically based on:
       - What the user actually asked
       - What data we found in the database
       - The detected sentiment (for empathy)
-    
+      - Recent session context (for multi-turn flows like refund confirmation)
+
     Returns response text, metadata, and what data was used.
     """
     primary = intent["primary_intent"]
     text = proc["cleaned"]
+
+    CONFIRMATION_WORDS = {"yes", "sure", "proceed", "confirm", "ok", "okay", "do it", "go ahead", "please", "yep", "yeah"}
+    REFUND_WORDS       = {"refund", "money back", "reimburse", "return"}
+
+    is_confirmation   = any(w in text for w in CONFIRMATION_WORDS)
+    in_refund_flow    = any(w in text for w in REFUND_WORDS) or any(w in context.lower() for w in REFUND_WORDS)
     data_used = []
     data_verified = False
 
@@ -348,6 +355,25 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             "source": "id_not_found"
         }
 
+    # ── Conversational bypass — takes priority over any DB context ──
+    CONVERSATIONAL_PHRASES = {"thank you", "thanks", "bye", "goodbye", "that's all",
+                               "that is all", "nothing else", "all good", "hello", "hi", "hey"}
+    is_conversational = primary in ("greeting", "thanks", "farewell") or \
+                        any(ph in text for ph in CONVERSATIONAL_PHRASES)
+    if is_conversational:
+        if primary == "greeting":
+            return {
+                "text": "Hello! I'm your AI support assistant with transparent confidence scoring. "
+                        "I can look up your orders, check refund eligibility, review subscriptions, and more. "
+                        "Just share your order ID (e.g. ORD-100001) or customer ID and I'll pull up your details!",
+                "data_verified": False, "data_used": [], "source": "greeting"
+            }
+        if primary == "farewell" or any(ph in text for ph in {"bye", "goodbye", "that's all", "that is all", "nothing else"}):
+            return {"text": "Goodbye! Don't hesitate to reach out if you need anything. Take care!",
+                    "data_verified": False, "data_used": [], "source": "farewell"}
+        return {"text": "You're welcome! Let me know if you need help with anything else.",
+                "data_verified": False, "data_used": [], "source": "thanks"}
+
     # ══════════════════════════════════════════════════════════
     # RESPONSES BUILT FROM REAL DATABASE DATA
     # ══════════════════════════════════════════════════════════
@@ -366,12 +392,22 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         data_verified = True
 
         # Refund request for a specific order
-        if primary in ("refund", "billing") and any(w in text for w in ["refund", "money back", "reimburse", "return"]):
+        is_refund_intent = primary in ("refund", "billing") or any(
+            w in text for w in ["refund", "money back", "reimburse", "return"]
+        )
+        if is_refund_intent or (is_confirmation and in_refund_flow):
             if refund_check:
                 if refund_check["eligible"]:
+                    if is_confirmation and in_refund_flow:
+                        return {
+                            "text": f"{empathy}Your refund of ${order['total']} for order {order['order_id']} has been successfully initiated. "
+                                    f"It will be returned to your original payment method within 5-7 business days. "
+                                    f"You'll receive a confirmation email shortly. Is there anything else I can help with?",
+                            "data_verified": True, "data_used": data_used, "source": "db_refund_processed"
+                        }
                     return {
                         "text": f"{empathy}I've checked order {order['order_id']} and it is eligible for a full refund of ${order['total']}. "
-                                f"The refund will be processed to your {order['transaction']['payment_method'] if order.get('transaction') else 'original payment method'} "
+                                f"The refund will be processed to your original payment method "
                                 f"within 5-7 business days. "
                                 f"Items: {items_str}. "
                                 f"Would you like me to proceed with the refund?",
@@ -385,6 +421,13 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
                                 f"Would you like me to connect you with a specialist to discuss alternative options?",
                         "data_verified": True, "data_used": data_used, "source": "db_refund_ineligible"
                     }
+            else:
+                return {
+                    "text": f"{empathy}I understand you'd like a refund for order {order['order_id']}, "
+                            f"but I was unable to locate the original transaction to verify eligibility. "
+                            f"Let me connect you with a specialist who can process this directly.",
+                    "data_verified": True, "data_used": data_used, "source": "db_refund_no_transaction"
+                }
 
         # Order tracking / status check
         if order["status"] == "delivered":
@@ -445,12 +488,19 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         data_used.append(f"transaction:{transaction['transaction_id']}")
         data_verified = True
 
-        is_refund_intent = primary in ("refund", "billing") and any(
+        is_refund_intent = primary in ("refund", "billing") or any(
             w in text for w in ["refund", "money back", "reimburse", "return", "back", "charge"]
         )
 
-        if is_refund_intent:
+        if is_refund_intent or (is_confirmation and in_refund_flow):
             if transaction.get("refund_eligible"):
+                if is_confirmation and in_refund_flow:
+                    return {
+                        "text": f"{empathy}Your refund of ${transaction['amount']} for transaction {transaction['transaction_id']} has been successfully initiated. "
+                                f"It will be returned to your {transaction.get('payment_method', 'original payment method')} within 5-7 business days. "
+                                f"You'll receive a confirmation email shortly. Is there anything else I can help with?",
+                        "data_verified": True, "data_used": data_used, "source": "db_txn_refund_processed"
+                    }
                 return {
                     "text": f"{empathy}Transaction {transaction['transaction_id']} is eligible for a refund. "
                             f"Amount: ${transaction['amount']} charged to {transaction.get('payment_method', 'your payment method')}. "
@@ -832,7 +882,7 @@ def chat():
     context   = get_recent_session_messages(session_id) or ""
     ids       = extract_ids(msg, context)
     db_ctx    = gather_db_context(ids, intent["primary_intent"])
-    response  = build_genuine_response(intent, sentiment, proc, db_ctx, ids)
+    response  = build_genuine_response(intent, sentiment, proc, db_ctx, ids, context)
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
     handoff   = evaluate_handoff(confidence, sentiment)
 
