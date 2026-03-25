@@ -1,0 +1,23 @@
+# Environments
+venv/
+env/
+.env
+
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+.vscode/
+.idea/
+
+# Web/Node
+frontend/node_modules/
+frontend/dist/
+
+# Machine Learning
+models/
+logs/
+*.safetensors
+*.bin

@@ -357,6 +357,29 @@ def get_retrain_candidates(limit: int = 20) -> Optional[List[Dict]]:
         return [dict(r) for r in cur.fetchall()]
 
 
+@db_operation
+def get_recent_session_messages(session_id: str, limit: int = 3) -> Optional[str]:
+    """Return the most recent user messages for a session as a single string.
+
+    Used as conversational context so extract_ids can resolve IDs mentioned in
+    earlier turns even when the current message contains no explicit ID.
+    Messages are returned oldest-first so regex will prefer the most recent match
+    when the caller searches from the end of the string.
+    """
+    with get_cursor() as cur:
+        cur.execute("""
+            SELECT user_message
+            FROM chat_interactions
+            WHERE session_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (session_id, limit))
+        rows = cur.fetchall()
+        if not rows:
+            return ""
+        return " ".join(r["user_message"] for r in reversed(rows))
+
+
 # ═══════════════════════════════════════════════════════════════
 # REFUND ELIGIBILITY CHECK
 # ═══════════════════════════════════════════════════════════════

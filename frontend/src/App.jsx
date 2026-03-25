@@ -33,17 +33,30 @@ const MOCK_DB = {
 /* ═══════════════════════════════════════════════════════════════
    MOCK API — generates genuine responses from mock DB
    ═══════════════════════════════════════════════════════════════ */
-function mockAPI(message) {
+function mockAPI(message, chatHistory = []) {
   const lower = message.toLowerCase();
   const upper = message.toUpperCase();
   const tokens = lower.split(/\s+/);
 
-  // Extract IDs
+  // Extract IDs from current message
   const ids = {};
   let match;
   if ((match = upper.match(/ORD-\d{5,7}/))) ids.order_id = match[0];
   if ((match = upper.match(/CUST-\d{5,7}/))) ids.customer_id = match[0];
   if ((match = upper.match(/TXN-\d{5,7}/))) ids.transaction_id = match[0];
+
+  // Fallback: scan recent history newest-first when current message has no IDs
+  if (!ids.order_id && !ids.customer_id && !ids.transaction_id) {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+      const prev = chatHistory[i];
+      if (!prev || !prev.text) continue;
+      const prevUpper = prev.text.toUpperCase();
+      if (!ids.order_id && (match = prevUpper.match(/ORD-\d{5,7}/))) ids.order_id = match[0];
+      if (!ids.customer_id && (match = prevUpper.match(/CUST-\d{5,7}/))) ids.customer_id = match[0];
+      if (!ids.transaction_id && (match = prevUpper.match(/TXN-\d{5,7}/))) ids.transaction_id = match[0];
+      if (ids.order_id && ids.customer_id && ids.transaction_id) break;
+    }
+  }
 
   // Sentiment
   const negW = ["terrible","awful","frustrated","angry","hate","worst","horrible","furious","broken","useless","disappointed"];
@@ -136,14 +149,38 @@ function mockAPI(message) {
     }
   } else if (transaction) {
     dbFound = true; dataVerified = true; dataUsed.push(`txn:${transaction.transaction_id}`);
-    responseText = `${empathy}Transaction ${transaction.transaction_id} found: ${transaction.type} | ${transaction.status} | $${transaction.amount} | ${transaction.payment_method} | ${transaction.transaction_date}.${transaction.refund_eligible ? ` Refund eligible (deadline: ${transaction.refund_deadline}).` : ""}`;
-    source = "db_transaction";
+    const isRefundIntent = ["refund", "billing"].includes(bestIntent) ||
+      ["refund", "money back", "reimburse", "return", "back"].some(w => lower.includes(w));
+    if (isRefundIntent) {
+      if (transaction.refund_eligible) {
+        responseText = `${empathy}Transaction ${transaction.transaction_id} is eligible for a refund of $${transaction.amount}. The refund will be processed to your ${transaction.payment_method} within 5-7 business days (deadline: ${transaction.refund_deadline}). Would you like me to initiate it?`;
+        source = "db_txn_refund_eligible";
+      } else if (transaction.status === "refunded") {
+        responseText = `${empathy}Transaction ${transaction.transaction_id} has already been fully refunded. The $${transaction.amount} should be back on your ${transaction.payment_method}. Anything else I can help with?`;
+        source = "db_txn_already_refunded";
+      } else {
+        responseText = `${empathy}Transaction ${transaction.transaction_id} is not eligible for a refund (status: ${transaction.status}). Would you like me to connect you with a specialist?`;
+        source = "db_txn_refund_ineligible";
+      }
+    } else {
+      responseText = `${empathy}Transaction ${transaction.transaction_id} found: ${transaction.type} | ${transaction.status} | $${transaction.amount} | ${transaction.payment_method} | ${transaction.transaction_date}.${transaction.refund_eligible ? ` Refund eligible (deadline: ${transaction.refund_deadline}).` : ""}`;
+      source = "db_transaction";
+    }
   } else if (customer) {
     dbFound = true; dataVerified = true; dataUsed.push(`customer:${customer.customer_id}`);
     const orderList = customer.orders.map(oid => { const o = MOCK_DB.orders[oid]; return o ? `${oid} (${o.status}, $${o.total})` : oid; }).join("; ");
     const s = customer.subscription;
-    responseText = `${empathy}Account ${customer.customer_id} found. Email: ${customer.email}. Orders: ${orderList}. Plan: ${s.plan_name.toUpperCase()} ($${s.plan_price}/${s.billing_cycle}) — ${s.status}. How can I help?`;
-    source = "db_customer_overview";
+    if (bestIntent === "subscription" && s) {
+      const auto = s.auto_renew ? "auto-renews" : "does not auto-renew";
+      responseText = `${empathy}Subscription for account ${customer.customer_id}: ${s.plan_name.toUpperCase()} plan at $${s.plan_price}/${s.billing_cycle}. Status: ${s.status} — ${auto}. Would you like to upgrade, downgrade, or cancel?`;
+      source = "db_customer_subscription";
+    } else if (["order_status", "shipping"].includes(bestIntent) && customer.orders.length > 0) {
+      responseText = `${empathy}Recent orders for account ${customer.customer_id}: ${orderList}. Share a specific order ID for full tracking details.`;
+      source = "db_customer_orders";
+    } else {
+      responseText = `${empathy}Account ${customer.customer_id} found. Email: ${customer.email}. Orders: ${orderList}. Plan: ${s.plan_name.toUpperCase()} ($${s.plan_price}/${s.billing_cycle}) — ${s.status}. How can I help?`;
+      source = "db_customer_overview";
+    }
   } else if (bestIntent === "greeting") {
     responseText = "Hello! I'm your AI support assistant with transparent confidence scoring. Share an order ID (ORD-100001), customer ID (CUST-001001), or describe your issue!";
     source = "greeting";
@@ -698,6 +735,7 @@ export default function App() {
   const [view, setView] = useState("chat"); // "chat" | "dashboard"
   const [token, setToken] = useState(() => localStorage.getItem("admin_token") || null);
   const isAuthenticated = !!token;
+  const [sessionId] = useState(() => crypto.randomUUID());
   const bottomRef = useRef(null);
 
   function handleLoginSuccess(newToken) {
@@ -728,9 +766,9 @@ export default function App() {
       let data;
       if (useMock) {
         await new Promise(r => setTimeout(r, 400 + Math.random() * 400));
-        data = mockAPI(userMsg.text);
+        data = mockAPI(userMsg.text, messages);
       } else {
-        const res = await fetch(`${API_URL}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg.text }) });
+        const res = await fetch(`${API_URL}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg.text, session_id: sessionId }) });
         data = await res.json();
       }
       setMessages(p => [...p, { id: Date.now() + 1, role: "bot", text: data.response, apiData: data }]);

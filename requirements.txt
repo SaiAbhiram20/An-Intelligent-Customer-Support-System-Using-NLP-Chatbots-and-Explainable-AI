@@ -5,3 +5,13 @@ python-dotenv==1.1.0
 gunicorn==23.0.0
 pytest==8.3.4
 PyJWT==2.8.0
+
+# ML inference
+transformers==4.41.0
+torch>=2.6.0
+
+# Fine-tuning pipeline (train_model.py only)
+datasets==2.19.0
+evaluate==0.4.2
+accelerate==0.30.0
+scikit-learn==1.5.0

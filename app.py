@@ -30,8 +30,20 @@ from db_service import (
     get_transaction_by_id, get_transactions_by_customer,
     get_subscription_by_id, get_subscription_by_customer,
     check_refund_eligibility,
-    log_interaction, save_feedback, get_analytics_data, get_retrain_candidates
+    log_interaction, save_feedback, get_analytics_data, get_retrain_candidates,
+    get_recent_session_messages
 )
+
+try:
+    from ml_service import ml_classify_intent, ml_analyze_sentiment
+    ML_AVAILABLE = True
+    logger_temp = logging.getLogger(__name__)
+    logger_temp.info("ML service loaded — using transformer models for NLP.")
+except Exception as _ml_err:
+    ML_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        f"ML service unavailable ({_ml_err}). Falling back to keyword-based NLP."
+    )
 
 # ─── App ──────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -213,8 +225,12 @@ def classify_intent(proc: dict) -> dict:
 
 # ─── ID Extraction ────────────────────────────────────────────
 
-def extract_ids(text: str) -> dict:
-    """Pull order/customer/transaction/subscription IDs from free text."""
+def extract_ids(text: str, context_text: str = "") -> dict:
+    """Pull order/customer/transaction/subscription IDs from free text.
+
+    If the current message contains no IDs, falls back to context_text
+    (recent session history) so follow-up questions retain the active entity.
+    """
     ids = {}
     patterns = {
         "order_id":        r'(ORD-\d{5,7})',
@@ -227,6 +243,14 @@ def extract_ids(text: str) -> dict:
         m = re.search(pat, upper)
         if m:
             ids[key] = m.group(1)
+
+    if not ids and context_text:
+        ctx_upper = context_text.upper()
+        for key, pat in patterns.items():
+            m = re.search(pat, ctx_upper)
+            if m:
+                ids[key] = m.group(1)
+
     return ids
 
 
@@ -421,6 +445,37 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         data_used.append(f"transaction:{transaction['transaction_id']}")
         data_verified = True
 
+        is_refund_intent = primary in ("refund", "billing") and any(
+            w in text for w in ["refund", "money back", "reimburse", "return", "back", "charge"]
+        )
+
+        if is_refund_intent:
+            if transaction.get("refund_eligible"):
+                return {
+                    "text": f"{empathy}Transaction {transaction['transaction_id']} is eligible for a refund. "
+                            f"Amount: ${transaction['amount']} charged to {transaction.get('payment_method', 'your payment method')}. "
+                            f"The refund will be processed within 5-7 business days "
+                            f"(deadline: {transaction.get('refund_deadline')}). "
+                            f"Would you like me to initiate the refund?",
+                    "data_verified": True, "data_used": data_used, "source": "db_txn_refund_eligible"
+                }
+            elif transaction["status"] == "refunded":
+                return {
+                    "text": f"{empathy}Transaction {transaction['transaction_id']} has already been fully refunded. "
+                            f"The ${transaction['amount']} should have been returned to "
+                            f"{transaction.get('payment_method', 'your payment method')}. "
+                            f"Is there anything else I can help with?",
+                    "data_verified": True, "data_used": data_used, "source": "db_txn_already_refunded"
+                }
+            else:
+                return {
+                    "text": f"{empathy}Unfortunately, transaction {transaction['transaction_id']} is not eligible for a refund "
+                            f"(status: {transaction['status']}, amount: ${transaction['amount']}). "
+                            f"Would you like me to connect you with a specialist to discuss alternatives?",
+                    "data_verified": True, "data_used": data_used, "source": "db_txn_refund_ineligible"
+                }
+
+        # Default: overview summary
         refund_note = ""
         if transaction.get("refund_eligible"):
             refund_note = f" This transaction is eligible for a refund (deadline: {transaction.get('refund_deadline')})."
@@ -441,6 +496,30 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         data_used.append(f"customer:{customer['customer_id']}")
         data_verified = True
 
+        # Subscription-focused
+        if primary == "subscription" and subscription:
+            auto = "auto-renews" if subscription.get("auto_renew") else "does not auto-renew"
+            return {
+                "text": f"{empathy}Subscription for account {customer['customer_id']}: "
+                        f"{subscription['plan_name'].upper()} plan at ${subscription['plan_price']}/{subscription['billing_cycle']}. "
+                        f"Status: {subscription['status']} — {auto} on {subscription.get('current_period_end')}. "
+                        f"Would you like to upgrade, downgrade, or cancel your subscription?",
+                "data_verified": True, "data_used": data_used, "source": "db_customer_subscription"
+            }
+
+        # Order/shipping-focused
+        if primary in ("order_status", "shipping") and customer_orders:
+            recent = customer_orders[:3]
+            order_lines = "; ".join(
+                f"{o['order_id']} ({o['status']}, ${o['total']})" for o in recent
+            )
+            return {
+                "text": f"{empathy}Recent orders for account {customer['customer_id']}: {order_lines}. "
+                        f"Share a specific order ID for full tracking details.",
+                "data_verified": True, "data_used": data_used, "source": "db_customer_orders"
+            }
+
+        # Default: full overview
         parts = [f"{empathy}Account {customer['customer_id']} found."]
 
         if customer_orders:
@@ -570,11 +649,15 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     intent_score = intent["confidence"]
     f1 = intent_score * 0.20
     matched_kws = intent["matched_keywords"].get(intent["primary_intent"], [])
+    if matched_kws:
+        f1_explanation = f"Matched {len(matched_kws)} keyword(s) in '{intent['primary_intent']}' category"
+    else:
+        f1_explanation = f"ML model probability for '{intent['primary_intent']}': {intent_score:.1%}"
     factors.append({
         "name": "Intent Match Strength", "weight": "20%",
         "raw_score": round(intent_score * 100, 1),
         "weighted_score": round(f1 * 100, 1),
-        "explanation": f"Matched {len(matched_kws)} keyword(s) in '{intent['primary_intent']}' category"
+        "explanation": f1_explanation
     })
 
     # 2. Intent Clarity (10%)
@@ -587,11 +670,17 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     else:
         clarity = 0.0
     f2 = clarity * 0.10
+    if matched_kws:
+        f2_explanation = "Clear separation between top categories" if clarity > 0.5 else "Multiple categories matched similarly (ambiguous)"
+    else:
+        top_pct  = f"{all_i[0]['score']:.1%}" if all_i else "—"
+        next_pct = f"{all_i[1]['score']:.1%}" if len(all_i) > 1 else "—"
+        f2_explanation = f"ML probability gap: top={top_pct} vs next={next_pct}"
     factors.append({
         "name": "Intent Clarity", "weight": "10%",
         "raw_score": round(clarity * 100, 1),
         "weighted_score": round(f2 * 100, 1),
-        "explanation": "Clear separation between top categories" if clarity > 0.5 else "Multiple categories matched similarly (ambiguous)"
+        "explanation": f2_explanation
     })
 
     # 3. Query Specificity (15%)
@@ -702,6 +791,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "database": "connected" if db_connected else "disconnected",
+        "ml_enabled": ML_AVAILABLE,
         "version": "2.0.0",
         "timestamp": datetime.utcnow().isoformat()
     })
@@ -718,9 +808,29 @@ def chat():
 
     # ── NLP Pipeline ──
     proc      = preprocess(msg)
-    sentiment = analyze_sentiment(proc)
-    intent    = classify_intent(proc)
-    ids       = extract_ids(msg)
+    if ML_AVAILABLE:
+        _s = ml_analyze_sentiment(msg)
+        _i = ml_classify_intent(msg)
+        # Normalise ML output to the contract the rest of the pipeline expects.
+        # ml_service uses "score" (0-1 signed); pipeline needs "intensity" (0-1 magnitude).
+        # ml_service uses "all_candidates"; pipeline needs "all_intents".
+        sentiment = {
+            **_s,
+            "intensity":        abs(_s.get("score", 0.0)),
+            "positive_matches": _s.get("positive_matches", []),
+            "negative_matches": _s.get("negative_matches", []),
+            "explanations":     [_s["explanation"]] if "explanation" in _s else _s.get("explanations", []),
+        }
+        intent = {
+            **_i,
+            "all_intents":  _i.get("all_intents") or _i.get("all_candidates", []),
+            "explanations": _i.get("explanations", []),
+        }
+    else:
+        sentiment = analyze_sentiment(proc)
+        intent    = classify_intent(proc)
+    context   = get_recent_session_messages(session_id) or ""
+    ids       = extract_ids(msg, context)
     db_ctx    = gather_db_context(ids, intent["primary_intent"])
     response  = build_genuine_response(intent, sentiment, proc, db_ctx, ids)
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
