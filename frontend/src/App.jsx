@@ -237,10 +237,14 @@ function mockAPI(message, chatHistory = []) {
   }
 
   // Confidence calculation with 5 factors (weights: 20/10/15/15/40)
-  const f1 = bestScore * 0.20;
-  const clarityVal = allIntents.length >= 2 ? Math.min((allIntents[0].score - allIntents[1].score) * 2, 1) : (allIntents.length === 1 ? allIntents[0].score : 0);
+  const CONV_OVERRIDE_WORDS = ["yes","sure","ok","okay","proceed","confirm","thanks","thank you","bye","goodbye","yep","yeah","go ahead","please","do it"];
+  const isConvOverride = tokens.length <= 3 && CONV_OVERRIDE_WORDS.some(w => lower.includes(w));
+
+  const intentScoreVal = isConvOverride ? 1.0 : bestScore;
+  const f1 = intentScoreVal * 0.20;
+  const clarityVal = isConvOverride ? 1.0 : (allIntents.length >= 2 ? Math.min((allIntents[0].score - allIntents[1].score) * 2, 1) : (allIntents.length === 1 ? allIntents[0].score : 0));
   const f2 = clarityVal * 0.10;
-  const specVal = tokens.length <= 2 ? 0.3 : tokens.length <= 5 ? 0.6 : tokens.length <= 15 ? 0.9 : 1.0;
+  const specVal = isConvOverride ? 1.0 : (tokens.length <= 2 ? 0.3 : tokens.length <= 5 ? 0.6 : tokens.length <= 15 ? 0.9 : 1.0);
   const f3 = specVal * 0.15;
   const f4 = 0.7 * 0.15;
   const dvVal = dbFound ? 1.0 : (dbErrors.length > 0 ? 0.3 : 0);
@@ -249,7 +253,7 @@ function mockAPI(message, chatHistory = []) {
   const confLevel = totalConf >= 75 ? "high" : totalConf >= 50 ? "medium" : totalConf >= 30 ? "low" : "very_low";
 
   const missing = [];
-  if (tokens.length <= 3) missing.push("More details about your situation");
+  if (tokens.length <= 3 && !isConvOverride) missing.push("More details about your situation");
   if (!dbFound && !dbErrors.length && ["order_status", "shipping", "refund", "billing"].includes(bestIntent))
     missing.push("Your order ID (e.g. ORD-100001) or transaction ID");
 
@@ -261,9 +265,9 @@ function mockAPI(message, chatHistory = []) {
       score: totalConf, level: confLevel,
       description: confLevel === "high" ? "Highly confident — verified against database." : confLevel === "medium" ? "Moderately confident. An ID would improve accuracy." : confLevel === "low" ? "Limited confidence. More details would help." : "Not confident. Recommending human agent.",
       factors: [
-        { name: "Intent Match Strength", weight: "20%", raw_score: Math.round(bestScore * 100), weighted_score: Math.round(f1 * 100), explanation: `Matched '${bestIntent}' category` },
-        { name: "Intent Clarity", weight: "10%", raw_score: Math.round(clarityVal * 100), weighted_score: Math.round(f2 * 100), explanation: allIntents.length >= 2 ? "Multiple categories detected" : "Single clear category" },
-        { name: "Query Specificity", weight: "15%", raw_score: Math.round(specVal * 100), weighted_score: Math.round(f3 * 100), explanation: `${tokens.length} words in query` },
+        { name: "Intent Match Strength", weight: "20%", raw_score: Math.round(intentScoreVal * 100), weighted_score: Math.round(f1 * 100), explanation: isConvOverride ? "Contextual confirmation/conversational phrase detected (100%)" : `Matched '${bestIntent}' category` },
+        { name: "Intent Clarity", weight: "10%", raw_score: Math.round(clarityVal * 100), weighted_score: Math.round(f2 * 100), explanation: isConvOverride ? "Contextual confirmation/conversational phrase detected (100%)" : (allIntents.length >= 2 ? "Multiple categories detected" : "Single clear category") },
+        { name: "Query Specificity", weight: "15%", raw_score: Math.round(specVal * 100), weighted_score: Math.round(f3 * 100), explanation: isConvOverride ? "Contextual confirmation/conversational phrase detected (100%)" : `${tokens.length} words in query` },
         { name: "Sentiment Alignment", weight: "15%", raw_score: 70, weighted_score: Math.round(f4 * 100), explanation: "Sentiment consistency check" },
         { name: "Data Verification", weight: "40%", raw_score: Math.round(dvVal * 100), weighted_score: Math.round(f5 * 100), explanation: dbFound ? `Verified: ${dbLookups.join(", ")}` : dbErrors.length ? "ID not found" : "No IDs provided" }
       ],

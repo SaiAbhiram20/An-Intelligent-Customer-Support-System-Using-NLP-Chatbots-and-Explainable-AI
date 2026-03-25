@@ -695,11 +695,25 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     """
     factors = []
 
+    # ── Conversational / confirmation override ──
+    # Short confirmations ("yes", "ok", "sure") and conversational phrases are
+    # penalised by the length-based specificity and low ML probability scores.
+    # When detected, override F1 (intent match) and F3 (specificity) to 100%
+    # so the total score reflects the genuine high confidence of the interaction.
+    CONV_OVERRIDE_WORDS = {"yes", "sure", "ok", "okay", "proceed", "confirm",
+                           "thanks", "thank you", "bye", "goodbye", "yep", "yeah",
+                           "go ahead", "please", "do it"}
+    tc = proc["token_count"]
+    msg_lower = proc["cleaned"].lower()
+    is_conv_override = tc <= 3 and any(w in msg_lower for w in CONV_OVERRIDE_WORDS)
+
     # 1. Intent Match Strength (20%)
-    intent_score = intent["confidence"]
+    intent_score = 1.0 if is_conv_override else intent["confidence"]
     f1 = intent_score * 0.20
     matched_kws = intent["matched_keywords"].get(intent["primary_intent"], [])
-    if matched_kws:
+    if is_conv_override:
+        f1_explanation = "Contextual confirmation/conversational phrase detected (100%)"
+    elif matched_kws:
         f1_explanation = f"Matched {len(matched_kws)} keyword(s) in '{intent['primary_intent']}' category"
     else:
         f1_explanation = f"ML model probability for '{intent['primary_intent']}': {intent_score:.1%}"
@@ -712,20 +726,25 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
     # 2. Intent Clarity (10%)
     all_i = intent.get("all_intents", [])
-    if len(all_i) >= 2:
+    if is_conv_override:
+        clarity = 1.0
+        f2_explanation = "Contextual confirmation/conversational phrase detected (100%)"
+    elif len(all_i) >= 2:
         top, second = all_i[0]["score"], all_i[1]["score"]
         clarity = (top - second) / top if top > 0 else 0.0
+        if matched_kws:
+            f2_explanation = "Clear separation between top categories" if clarity > 0.5 else "Multiple categories matched similarly (ambiguous)"
+        else:
+            top_pct  = f"{all_i[0]['score']:.1%}"
+            next_pct = f"{all_i[1]['score']:.1%}"
+            f2_explanation = f"ML probability gap: top={top_pct} vs next={next_pct}"
     elif all_i:
-        clarity = 1.0  # only one intent matched — unambiguous
+        clarity = 1.0
+        f2_explanation = "Single clear category"
     else:
         clarity = 0.0
+        f2_explanation = "No intent matched"
     f2 = clarity * 0.10
-    if matched_kws:
-        f2_explanation = "Clear separation between top categories" if clarity > 0.5 else "Multiple categories matched similarly (ambiguous)"
-    else:
-        top_pct  = f"{all_i[0]['score']:.1%}" if all_i else "—"
-        next_pct = f"{all_i[1]['score']:.1%}" if len(all_i) > 1 else "—"
-        f2_explanation = f"ML probability gap: top={top_pct} vs next={next_pct}"
     factors.append({
         "name": "Intent Clarity", "weight": "10%",
         "raw_score": round(clarity * 100, 1),
@@ -734,15 +753,18 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     })
 
     # 3. Query Specificity (15%)
-    tc = proc["token_count"]
-    spec = round(min(1.0, tc ** 0.5 / 4.0), 3)
+    spec = 1.0 if is_conv_override else round(min(1.0, tc ** 0.5 / 4.0), 3)
     f3 = spec * 0.15
-    spec_label = "Very short" if tc <= 2 else ("Moderate" if tc <= 6 else ("Detailed" if tc <= 14 else "Rich context"))
+    if is_conv_override:
+        spec_explanation = "Contextual confirmation/conversational phrase detected (100%)"
+    else:
+        spec_label = "Very short" if tc <= 2 else ("Moderate" if tc <= 6 else ("Detailed" if tc <= 14 else "Rich context"))
+        spec_explanation = f"{spec_label} ({tc} tokens)"
     factors.append({
         "name": "Query Specificity", "weight": "15%",
         "raw_score": round(spec * 100, 1),
         "weighted_score": round(f3 * 100, 1),
-        "explanation": f"{spec_label} ({tc} tokens)"
+        "explanation": spec_explanation
     })
 
     # 4. Sentiment Alignment (15%)
@@ -792,7 +814,7 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
     # Missing info suggestions
     missing = []
-    if tc <= 3:
+    if tc <= 3 and not is_conv_override:
         missing.append("More details about your specific situation")
     if not db_ctx["found"] and not db_ctx["errors"]:
         if primary in ("order_status","shipping","refund","billing"):
