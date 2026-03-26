@@ -19,7 +19,14 @@
       "Bash(venv/Scripts/python.exe -m pip install datasets accelerate evaluate scikit-learn)",
       "Bash(venv/Scripts/python.exe train_model.py)",
       "Bash(venv/Scripts/python.exe -c \"from ml_service import ml_classify_intent, ml_analyze_sentiment, USE_FINETUNED; print\\(''Fine-tuned:'', USE_FINETUNED\\); print\\(ml_classify_intent\\(''where is my order''\\)\\)\")",
-      "Bash(venv/Scripts/python.exe -m pytest test_app.py -v --tb=short -q)"
+      "Bash(venv/Scripts/python.exe -m pytest test_app.py -v --tb=short -q)",
+      "Bash(git clone:*)",
+      "Bash(dir:*)",
+      "Bash(git:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s \"https://api.github.com/repos/garrytan/gstack/contents/.agents/skills\")",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(d[''''name'''']\\) for d in data if d[''''type'''']==''''dir'''']\")",
+      "Bash(npm run:*)"
     ]
   }
 }

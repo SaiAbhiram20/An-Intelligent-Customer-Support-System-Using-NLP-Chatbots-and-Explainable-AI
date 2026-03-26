@@ -247,7 +247,8 @@ function mockAPI(message, chatHistory = []) {
   const specVal = isConvOverride ? 1.0 : (tokens.length <= 2 ? 0.3 : tokens.length <= 5 ? 0.6 : tokens.length <= 15 ? 0.9 : 1.0);
   const f3 = specVal * 0.15;
   const f4 = 0.7 * 0.15;
-  const dvVal = dbFound ? 1.0 : (dbErrors.length > 0 ? 0.3 : 0);
+  // Conversational confirmations carry implicit DB trust from the previous turn
+  const dvVal = dbFound ? 1.0 : (dbErrors.length > 0 ? 0.3 : (isConvOverride ? 0.7 : 0));
   const f5 = dvVal * 0.40;
   const totalConf = Math.round((f1 + f2 + f3 + f4 + f5) * 1000) / 10;
   const confLevel = totalConf >= 75 ? "high" : totalConf >= 50 ? "medium" : totalConf >= 30 ? "low" : "very_low";
@@ -269,7 +270,7 @@ function mockAPI(message, chatHistory = []) {
         { name: "Intent Clarity", weight: "10%", raw_score: Math.round(clarityVal * 100), weighted_score: Math.round(f2 * 100), explanation: isConvOverride ? "Contextual confirmation/conversational phrase detected (100%)" : (allIntents.length >= 2 ? "Multiple categories detected" : "Single clear category") },
         { name: "Query Specificity", weight: "15%", raw_score: Math.round(specVal * 100), weighted_score: Math.round(f3 * 100), explanation: isConvOverride ? "Contextual confirmation/conversational phrase detected (100%)" : `${tokens.length} words in query` },
         { name: "Sentiment Alignment", weight: "15%", raw_score: 70, weighted_score: Math.round(f4 * 100), explanation: "Sentiment consistency check" },
-        { name: "Data Verification", weight: "40%", raw_score: Math.round(dvVal * 100), weighted_score: Math.round(f5 * 100), explanation: dbFound ? `Verified: ${dbLookups.join(", ")}` : dbErrors.length ? "ID not found" : "No IDs provided" }
+        { name: "Data Verification", weight: "40%", raw_score: Math.round(dvVal * 100), weighted_score: Math.round(f5 * 100), explanation: dbFound ? `Verified: ${dbLookups.join(", ")}` : dbErrors.length ? "ID not found" : isConvOverride ? "Contextual confirmation — implied verification from conversation history" : "No IDs provided" }
       ],
       missing_information: missing
     },
@@ -288,22 +289,38 @@ function mockAPI(message, chatHistory = []) {
 
 const ConfidenceMeter = ({ score, level }) => {
   const color = score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : score >= 30 ? "#f97316" : "#ef4444";
+  const glow  = score >= 75 ? "rgba(16,185,129,0.25)" : score >= 50 ? "rgba(245,158,11,0.25)" : score >= 30 ? "rgba(249,115,22,0.25)" : "rgba(239,68,68,0.25)";
+  const circumference = 2 * Math.PI * 22; // r=22
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ position: "relative", width: 52, height: 52 }}>
-        <svg width="52" height="52" viewBox="0 0 52 52">
-          <circle cx="26" cy="26" r="22" fill="none" stroke="#0f172a" strokeWidth="4" />
-          <circle cx="26" cy="26" r="22" fill="none" stroke={color} strokeWidth="4"
-            strokeDasharray={`${(score / 100) * 138.2} 138.2`} strokeLinecap="round"
-            transform="rotate(-90 26 26)" style={{ transition: "stroke-dasharray 0.8s ease" }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ position: "relative", width: 56, height: 56 }}>
+        <svg width="56" height="56" viewBox="0 0 56 56">
+          {/* Track */}
+          <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+          {/* Glow halo */}
+          <circle cx="28" cy="28" r="22" fill="none" stroke={color} strokeWidth="6"
+            strokeDasharray={`${(score / 100) * circumference} ${circumference}`}
+            strokeLinecap="round" transform="rotate(-90 28 28)"
+            style={{ filter: `drop-shadow(0 0 5px ${glow})`, transition: "stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)" }}
+            opacity="0.35"
+          />
+          {/* Active arc */}
+          <circle cx="28" cy="28" r="22" fill="none" stroke={color} strokeWidth="3.5"
+            strokeDasharray={`${(score / 100) * circumference} ${circumference}`}
+            strokeLinecap="round" transform="rotate(-90 28 28)"
+            style={{ transition: "stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)" }}
+          />
         </svg>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 12, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace"
+        }}>
           {Math.round(score)}
         </div>
       </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color, textTransform: "uppercase", letterSpacing: 1 }}>{level}</div>
-        <div style={{ fontSize: 11, color: "#64748b" }}>confidence</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.2 }}>{level}</div>
+        <div style={{ fontSize: 11, color: "#364d66", marginTop: 1 }}>confidence</div>
       </div>
     </div>
   );
@@ -311,16 +328,26 @@ const ConfidenceMeter = ({ score, level }) => {
 
 const FactorBar = ({ factor }) => {
   const pct = Math.min(factor.raw_score, 100);
+  const gradient = pct >= 70
+    ? "linear-gradient(90deg, #059669, #10b981)"
+    : pct >= 40
+    ? "linear-gradient(90deg, #d97706, #f59e0b)"
+    : "linear-gradient(90deg, #dc2626, #f87171)";
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-        <span style={{ color: "#cbd5e1", fontWeight: 500 }}>{factor.name} <span style={{ color: "#475569" }}>({factor.weight})</span></span>
-        <span style={{ color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{factor.raw_score}%</span>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+        <span style={{ color: "#a8c0de", fontWeight: 500 }}>
+          {factor.name} <span style={{ color: "#364d66" }}>({factor.weight})</span>
+        </span>
+        <span style={{ color: "#7a9dc4", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{factor.raw_score}%</span>
       </div>
-      <div style={{ height: 6, background: "#0f172a", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#ef4444", borderRadius: 3, transition: "width 0.6s ease" }} />
+      <div style={{ height: 5, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{
+          height: "100%", width: `${pct}%`, background: gradient,
+          borderRadius: 3, transition: "width 0.7s cubic-bezier(.4,0,.2,1)"
+        }} />
       </div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{factor.explanation}</div>
+      <div style={{ fontSize: 11, color: "#364d66", marginTop: 3, lineHeight: 1.4 }}>{factor.explanation}</div>
     </div>
   );
 };
@@ -329,59 +356,119 @@ const DataBadge = ({ meta }) => {
   if (!meta) return null;
   const v = meta.data_verified;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-      background: v ? "#052e16" : "#0f172a", border: `1px solid ${v ? "#16a34a" : "#1e293b"}`, color: v ? "#4ade80" : "#94a3b8" }}>
-      {v ? "\u2713 DB Verified" : "\u25CB No DB Data"}
-      {meta.source && <span style={{ opacity: 0.6 }}> &bull; {meta.source.replace(/_/g, " ")}</span>}
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px",
+      borderRadius: 20, fontSize: 11, fontWeight: 600,
+      background: v ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.04)",
+      border: `1px solid ${v ? "rgba(16,185,129,0.30)" : "rgba(255,255,255,0.07)"}`,
+      color: v ? "#4ade80" : "#4a6a8a"
+    }}>
+      <span style={{ fontSize: 9 }}>{v ? "●" : "○"}</span>
+      {v ? "DB Verified" : "No DB Data"}
+      {meta.source && <span style={{ opacity: 0.55 }}> · {meta.source.replace(/_/g, " ")}</span>}
     </span>
   );
 };
 
 const ExplainPanel = ({ data, isOpen, toggle }) => {
   if (!data) return null;
-  const db = data.explainability?.database;
+  const db   = data.explainability?.database;
+  const sent = data.explainability?.sentiment;
+  const sentColor = sent?.label === "positive" ? "#10b981" : sent?.label === "negative" ? "#ef4444" : "#3b82f6";
+  const sentBg    = sent?.label === "positive" ? "rgba(16,185,129,0.08)" : sent?.label === "negative" ? "rgba(239,68,68,0.08)" : "rgba(59,130,246,0.08)";
   return (
-    <div style={{ marginTop: 8 }}>
-      <button onClick={toggle} style={{ background: "none", border: "1px solid #1e293b", borderRadius: 8, color: "#94a3b8", fontSize: 12, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>&#x25B6;</span>
+    <div style={{ marginTop: 10 }}>
+      <button onClick={toggle} style={{
+        background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
+        color: "#4a6a8a", fontSize: 12, padding: "5px 12px", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6,
+        transition: "border-color 0.2s, color 0.2s"
+      }}>
+        <span style={{ display: "inline-block", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s", fontSize: 10 }}>▶</span>
         {isOpen ? "Hide" : "Show"} AI Reasoning
       </button>
+
       {isOpen && (
-        <div style={{ marginTop: 10, padding: 16, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 10, animation: "fadeIn 0.3s ease" }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Confidence Breakdown</h4>
+        <div style={{
+          marginTop: 10, padding: "18px 16px",
+          background: "rgba(8,14,28,0.85)",
+          border: "1px solid rgba(6,214,255,0.10)",
+          borderLeft: "2px solid rgba(6,214,255,0.35)",
+          borderRadius: "0 12px 12px 12px",
+          animation: "fadeIn 0.25s ease"
+        }}>
+          {/* Confidence Factors */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
+            Confidence Breakdown
+          </div>
           {data.confidence.factors.map((f, i) => <FactorBar key={i} factor={f} />)}
 
+          {/* DB Lookups */}
           {db && db.lookups_performed?.length > 0 && (
-            <div style={{ marginBottom: 16, padding: 12, background: "#0a1128", border: "1px solid #1e3a8a", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Database Lookups</div>
-              {db.lookups_performed.map((l, i) => <div key={i} style={{ fontSize: 12, color: "#93c5fd", marginBottom: 2 }}>&bull; {l}</div>)}
+            <div style={{
+              marginTop: 4, marginBottom: 16, padding: "10px 12px",
+              background: "rgba(6,214,255,0.05)", border: "1px solid rgba(6,214,255,0.12)",
+              borderRadius: 8
+            }}>
+              <div style={{ fontSize: 11, color: "#06d6ff", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                Database Lookups
+              </div>
+              {db.lookups_performed.map((l, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#7ab8e8", marginBottom: 2 }}>· {l}</div>
+              ))}
               {db.ids_extracted && Object.keys(db.ids_extracted).length > 0 && (
-                <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>IDs: {JSON.stringify(db.ids_extracted)}</div>
+                <div style={{ fontSize: 11, color: "#364d66", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {JSON.stringify(db.ids_extracted)}
+                </div>
               )}
             </div>
           )}
 
-          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Intent Analysis</h4>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          {/* Intent Candidates */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+            Intent Analysis
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
             {data.explainability.intent.all_candidates.map((c, i) => (
-              <span key={i} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 12, background: i === 0 ? "#1e3a8a" : "#0f172a", border: `1px solid ${i === 0 ? "#14b8a6" : "#1e293b"}`, color: i === 0 ? "#93c5fd" : "#94a3b8" }}>
+              <span key={i} style={{
+                padding: "3px 10px", borderRadius: 20, fontSize: 11,
+                background: i === 0 ? "rgba(6,214,255,0.10)" : "rgba(255,255,255,0.04)",
+                border: `1px solid ${i === 0 ? "rgba(6,214,255,0.30)" : "rgba(255,255,255,0.06)"}`,
+                color: i === 0 ? "#06d6ff" : "#4a6a8a",
+                fontWeight: i === 0 ? 600 : 400
+              }}>
                 {c.intent}: {(c.score * 100).toFixed(0)}%
               </span>
             ))}
           </div>
 
-          <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Sentiment</h4>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-            background: data.explainability.sentiment.label === "positive" ? "#052e16" : data.explainability.sentiment.label === "negative" ? "#350a0a" : "#172554",
-            border: `1px solid ${data.explainability.sentiment.label === "positive" ? "#16a34a" : data.explainability.sentiment.label === "negative" ? "#dc2626" : "#2563eb"}`,
-            color: data.explainability.sentiment.label === "positive" ? "#4ade80" : data.explainability.sentiment.label === "negative" ? "#f87171" : "#60a5fa" }}>
-            {data.explainability.sentiment.label === "positive" ? "\u2191" : data.explainability.sentiment.label === "negative" ? "\u2193" : "\u2192"} {data.explainability.sentiment.label} ({data.explainability.sentiment.score})
-          </span>
+          {/* Sentiment */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+            Sentiment
+          </div>
+          {sent && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: sentBg, border: `1px solid ${sentColor}33`, color: sentColor
+            }}>
+              {sent.label === "positive" ? "↑" : sent.label === "negative" ? "↓" : "→"} {sent.label} · score {sent.score}
+            </span>
+          )}
 
+          {/* Missing info */}
           {data.confidence.missing_information?.length > 0 && (
-            <div style={{ marginTop: 12, padding: 12, background: "#1c1917", border: "1px solid #78350f", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>Information I'm missing:</div>
-              {data.confidence.missing_information.map((m, i) => <div key={i} style={{ fontSize: 12, color: "#d97706", marginBottom: 2 }}>&bull; {m}</div>)}
+            <div style={{
+              marginTop: 14, padding: "10px 12px",
+              background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.18)",
+              borderRadius: 8
+            }}>
+              <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                Missing Information
+              </div>
+              {data.confidence.missing_information.map((m, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#d97706", marginBottom: 2 }}>· {m}</div>
+              ))}
             </div>
           )}
         </div>
@@ -413,21 +500,22 @@ const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
 
   if (submitted) {
     return (
-      <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
-        {submitted === "up" ? "\u{1F44D}" : "\u{1F44E}"} Feedback recorded — thank you!
+      <div style={{ marginTop: 8, fontSize: 12, color: "#364d66" }}>
+        {submitted === "up" ? "👍" : "👎"} Feedback recorded — thank you!
       </div>
     );
   }
 
+  const btnStyle = {
+    background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 6,
+    padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#4a6a8a", lineHeight: 1,
+    transition: "border-color 0.2s, color 0.2s"
+  };
   return (
-    <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center" }}>
-      <span style={{ fontSize: 11, color: "#475569" }}>Was this helpful?</span>
-      <button onClick={() => submit("up")}
-        style={{ background: "none", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
-        title="Helpful">{"\u{1F44D}"}</button>
-      <button onClick={() => submit("down")}
-        style={{ background: "none", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#94a3b8", lineHeight: 1 }}
-        title="Not helpful">{"\u{1F44E}"}</button>
+    <div style={{ marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
+      <span style={{ fontSize: 11, color: "#364d66" }}>Helpful?</span>
+      <button onClick={() => submit("up")} style={btnStyle} title="Helpful">👍</button>
+      <button onClick={() => submit("down")} style={btnStyle} title="Not helpful">👎</button>
     </div>
   );
 };
@@ -435,30 +523,68 @@ const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
 const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
   const isUser = msg.role === "user";
   return (
-    <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 16, animation: "slideUp 0.3s ease" }}>
-      <div style={{ maxWidth: "82%", minWidth: 120 }}>
-        <div style={{ padding: "12px 16px", borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          background: isUser ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "#0f172a",
-          color: isUser ? "#fff" : "#f8fafc", fontSize: 14, lineHeight: 1.6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+    <div style={{
+      display: "flex",
+      justifyContent: isUser ? "flex-end" : "flex-start",
+      marginBottom: 20,
+      animation: "slideUp 0.28s cubic-bezier(.4,0,.2,1)"
+    }}>
+      <div style={{ maxWidth: "80%", minWidth: 120 }}>
+        {/* Message bubble */}
+        <div style={{
+          padding: "12px 17px",
+          borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
+          background: isUser
+            ? "linear-gradient(135deg, #0e5fdc, #1a3fc4)"
+            : "rgba(12, 20, 36, 0.90)",
+          border: isUser
+            ? "none"
+            : "1px solid rgba(6,214,255,0.10)",
+          color: isUser ? "#fff" : "#d8ecff",
+          fontSize: 14,
+          lineHeight: 1.65,
+          boxShadow: isUser
+            ? "0 4px 16px rgba(14,95,220,0.35), 0 1px 3px rgba(0,0,0,0.4)"
+            : "0 2px 12px rgba(0,0,0,0.35)"
+        }}>
           {msg.text}
         </div>
+
+        {/* Bot metadata row */}
         {!isUser && msg.apiData && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <ConfidenceMeter score={msg.apiData.confidence.score} level={msg.apiData.confidence.level} />
               <DataBadge meta={msg.apiData.response_meta} />
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, maxWidth: 400 }}>{msg.apiData.confidence.description}</div>
+            <div style={{ fontSize: 12, color: "#364d66", marginTop: 5, maxWidth: 420, lineHeight: 1.5 }}>
+              {msg.apiData.confidence.description}
+            </div>
             <FeedbackButtons interactionId={msg.apiData.interaction_id} useMock={useMock} />
           </div>
         )}
+
+        {/* Human handoff alert */}
         {!isUser && msg.apiData?.handoff?.recommended && (
-          <div style={{ marginTop: 8, padding: 10, background: "#2d1515", border: "1px solid #991b1b", borderRadius: 8, fontSize: 12, color: "#fca5a5" }}>
-            <strong>Human handoff:</strong> {msg.apiData.handoff.reasons.join("; ")}
-            <button style={{ display: "block", marginTop: 6, padding: "6px 14px", background: "#dc2626", border: "none", borderRadius: 6, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Connect with Agent</button>
+          <div style={{
+            marginTop: 10, padding: "10px 14px",
+            background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)",
+            borderRadius: 10, fontSize: 12, color: "#fca5a5"
+          }}>
+            <strong style={{ color: "#f87171" }}>Human handoff recommended</strong>
+            <div style={{ marginTop: 3, color: "#9a6a6a" }}>{msg.apiData.handoff.reasons.join("; ")}</div>
+            <button style={{
+              display: "inline-block", marginTop: 8, padding: "6px 14px",
+              background: "linear-gradient(135deg, #dc2626, #b91c1c)", border: "none",
+              borderRadius: 7, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600
+            }}>Connect with Agent</button>
           </div>
         )}
-        {!isUser && msg.apiData && <ExplainPanel data={msg.apiData} isOpen={explainOpen} toggle={toggleExplain} />}
+
+        {/* AI Reasoning panel */}
+        {!isUser && msg.apiData && (
+          <ExplainPanel data={msg.apiData} isOpen={explainOpen} toggle={toggleExplain} />
+        )}
       </div>
     </div>
   );
@@ -467,24 +593,31 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
 /* ═══════════════════════════════════════════════════════════════
    ANALYTICS DASHBOARD (Feature 5)
    ═══════════════════════════════════════════════════════════════ */
-const StatCard = ({ label, value, sub, color = "#f8fafc" }) => (
-  <div style={{ flex: "1 1 180px", padding: 20, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 12 }}>
-    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-    <div style={{ fontSize: 28, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{sub}</div>}
+const StatCard = ({ label, value, sub, color = "#e2eeff" }) => (
+  <div style={{
+    flex: "1 1 180px", padding: "18px 20px",
+    background: "rgba(12, 20, 36, 0.80)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderLeft: "2px solid rgba(6,214,255,0.25)",
+    borderRadius: 14,
+    boxShadow: "0 2px 16px rgba(0,0,0,0.3)"
+  }}>
+    <div style={{ fontSize: 11, color: "#364d66", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1.1 }}>{label}</div>
+    <div style={{ fontSize: 26, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -0.5 }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: "#364d66", marginTop: 4 }}>{sub}</div>}
   </div>
 );
 
 const IntentBar = ({ intent, count, max }) => {
   const pct = max > 0 ? (count / max) * 100 : 0;
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-        <span style={{ color: "#cbd5e1" }}>{intent}</span>
-        <span style={{ color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{count}</span>
+    <div style={{ marginBottom: 9 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+        <span style={{ color: "#a8c0de" }}>{intent}</span>
+        <span style={{ color: "#4a6a8a", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{count}</span>
       </div>
-      <div style={{ height: 6, background: "#0f172a", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #14b8a6, #3b82f6)", borderRadius: 3, transition: "width 0.6s ease" }} />
+      <div style={{ height: 5, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #00b4a4, #3b82f6)", borderRadius: 3, transition: "width 0.7s cubic-bezier(.4,0,.2,1)" }} />
       </div>
     </div>
   );
@@ -522,51 +655,86 @@ function LoginPage({ onSuccess }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#020617", color: "#f8fafc", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        input:focus { outline: none; }
-      `}</style>
+    <div style={{ minHeight: "100vh", background: "#04080f", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      {/* Animated mesh gradient blobs */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div style={{
+          position: "absolute", top: "35%", left: "30%", width: 520, height: 520,
+          background: "radial-gradient(circle, rgba(6,214,255,0.10) 0%, transparent 70%)",
+          borderRadius: "50%", transform: "translate(-50%,-50%)",
+          animation: "meshA 18s ease-in-out infinite"
+        }} />
+        <div style={{
+          position: "absolute", top: "65%", left: "70%", width: 420, height: 420,
+          background: "radial-gradient(circle, rgba(139,92,246,0.09) 0%, transparent 70%)",
+          borderRadius: "50%", transform: "translate(-50%,-50%)",
+          animation: "meshB 22s ease-in-out infinite"
+        }} />
+        <div style={{
+          position: "absolute", top: "20%", left: "70%", width: 300, height: 300,
+          background: "radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 70%)",
+          borderRadius: "50%", transform: "translate(-50%,-50%)",
+          animation: "meshA 28s ease-in-out infinite reverse"
+        }} />
+      </div>
 
-      <div style={{ animation: "slideUp 0.3s ease", width: "100%", maxWidth: 400, padding: "0 24px" }}>
+      <div style={{ animation: "slideUp 0.35s ease", width: "100%", maxWidth: 400, padding: "0 24px", position: "relative", zIndex: 1 }}>
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, #14b8a6, #3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 16px" }}>{"\u{1F916}"}</div>
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Intelligent Support</div>
-          <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>Sign in to access the platform</div>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: 18,
+            background: "linear-gradient(135deg, #06d6ff, #2563eb)",
+            boxShadow: "0 0 28px rgba(6,214,255,0.30)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 28, margin: "0 auto 18px"
+          }}>{"\u{1F916}"}</div>
+          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6, color: "#e2eeff" }}>Intelligent Support</div>
+          <div style={{ fontSize: 13, color: "#4a6a8a", marginTop: 6, letterSpacing: 0.1 }}>Sign in to access the platform</div>
         </div>
 
-        {/* Card */}
-        <div style={{ background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 16, padding: 32 }}>
+        {/* Glass Card */}
+        <div style={{
+          background: "rgba(12, 20, 34, 0.72)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(6,214,255,0.16)",
+          borderRadius: 20,
+          padding: "32px 32px 28px",
+          boxShadow: "0 8px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset"
+        }}>
           <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Username</div>
-              <input value={username} onChange={e => setUsername(e.target.value)} autoFocus required
-                placeholder="Enter your username"
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #1e293b", background: "#0f172a", color: "#f8fafc", fontSize: 14, fontFamily: "inherit" }} />
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
+              <input
+                value={username} onChange={e => setUsername(e.target.value)}
+                autoFocus required placeholder="Enter your username"
+                className="login-input"
+              />
             </div>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Password</div>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                placeholder="Enter your password"
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #1e293b", background: "#0f172a", color: "#f8fafc", fontSize: 14, fontFamily: "inherit" }} />
+            <div style={{ marginBottom: 26 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
+              <input
+                type="password" value={password} onChange={e => setPassword(e.target.value)}
+                required placeholder="Enter your password"
+                className="login-input"
+              />
             </div>
             {error && (
-              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 20 }}>
+              <div style={{
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 20
+              }}>
                 {error}
               </div>
             )}
-            <button type="submit" disabled={loading}
-              style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: loading ? "#0f172a" : "linear-gradient(135deg, #2563eb, #3b82f6)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: loading ? "default" : "pointer", letterSpacing: -0.2 }}>
-              {loading ? "Signing in…" : "Sign In"}
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? "Signing in…" : "Sign In →"}
             </button>
           </form>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#1e293b" }}>
-          NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI
+        <div style={{ textAlign: "center", marginTop: 22, fontSize: 11, color: "#1e3048", letterSpacing: 0.5 }}>
+          NLP &bull; Database Verified &bull; Confidence Scoring &bull; XAI
         </div>
       </div>
     </div>
@@ -646,7 +814,7 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
 
   if (loading) {
     return (
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
         Loading analytics...
       </div>
     );
@@ -655,7 +823,7 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#f87171" }}>
         <div>{error}</div>
-        <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #1e293b", background: "#0f172a", color: "#f8fafc", cursor: "pointer", fontSize: 13 }}>Retry</button>
+        <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-elevated)", color: "var(--text-primary)", cursor: "pointer", fontSize: 13 }}>Retry</button>
       </div>
     );
   }
@@ -676,22 +844,22 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Intent Distribution */}
-        <div style={{ padding: 20, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 12 }}>
-          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>Query Trends (Top Intents)</h3>
+        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(6,214,255,0.20)", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: 0.8 }}>Query Trends</h3>
           {data.intent_distribution.map((d, i) => (
             <IntentBar key={i} intent={d.detected_intent} count={d.cnt} max={maxIntent} />
           ))}
         </div>
 
         {/* Daily Volume Chart */}
-        <div style={{ padding: 20, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 12 }}>
-          <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>Daily Query Volume</h3>
+        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(139,92,246,0.20)", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: 0.8 }}>Daily Volume</h3>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 140 }}>
             {data.daily_volume.map((d, i) => (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
-                <div style={{ width: "100%", background: "linear-gradient(180deg, #14b8a6, #1e40af)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4 }} />
-                <div style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
+                <div style={{ width: "100%", background: "linear-gradient(180deg, #06d6ff, #2563eb)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4, opacity: 0.8 }} />
+                <div style={{ fontSize: 9, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
               </div>
             ))}
           </div>
@@ -699,32 +867,32 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
       </div>
 
       {/* Recent Feedback */}
-      <div style={{ padding: 20, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 12, marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>Recent Feedback</h3>
+      <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: 0.8 }}>Recent Feedback</h3>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #1e293b" }}>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 {["Rating", "User Message", "Intent", "Confidence", "Comment", "Time"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", color: "#64748b", fontWeight: 500 }}>{h}</th>
+                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 10 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.recent_feedback.map((fb, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #0b0f19" }}>
-                  <td style={{ padding: "8px 10px" }}>
+                <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  <td style={{ padding: "9px 10px" }}>
                     <span style={{ display: "inline-block", width: 28, textAlign: "center", padding: "2px 0", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
-                      background: fb.rating >= 4 ? "#052e16" : fb.rating <= 2 ? "#350a0a" : "#172554",
+                      background: fb.rating >= 4 ? "rgba(16,185,129,0.12)" : fb.rating <= 2 ? "rgba(239,68,68,0.12)" : "rgba(59,130,246,0.12)",
                       color: fb.rating >= 4 ? "#4ade80" : fb.rating <= 2 ? "#f87171" : "#60a5fa" }}>
                       {fb.rating}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#cbd5e1", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fb.user_message}</td>
-                  <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{fb.detected_intent}</td>
-                  <td style={{ padding: "8px 10px", color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{fb.confidence_score}%</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontStyle: fb.comment ? "normal" : "italic" }}>{fb.comment || "—"}</td>
-                  <td style={{ padding: "8px 10px", color: "#475569", whiteSpace: "nowrap" }}>{fb.created_at ? new Date(fb.created_at).toLocaleString() : "—"}</td>
+                  <td style={{ padding: "9px 10px", color: "var(--text-primary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fb.user_message}</td>
+                  <td style={{ padding: "9px 10px", color: "var(--text-secondary)" }}>{fb.detected_intent}</td>
+                  <td style={{ padding: "9px 10px", color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>{fb.confidence_score}%</td>
+                  <td style={{ padding: "9px 10px", color: "var(--text-muted)", fontStyle: fb.comment ? "normal" : "italic" }}>{fb.comment || "—"}</td>
+                  <td style={{ padding: "9px 10px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{fb.created_at ? new Date(fb.created_at).toLocaleString() : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -734,23 +902,23 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
 
       {/* Retrain Candidates (Feature 6) */}
       {retrain && retrain.candidates && retrain.candidates.length > 0 && (
-        <div style={{ padding: 20, background: "#1a0a00", border: "1px solid #78350f", borderRadius: 12 }}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#fbbf24" }}>Needs Retraining ({retrain.count})</h3>
-          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#a16207" }}>These interactions received poor ratings and are flagged for NLP improvement.</p>
+        <div style={{ padding: 20, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.18)", borderLeft: "2px solid rgba(245,158,11,0.40)", borderRadius: 12 }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.8 }}>Needs Retraining ({retrain.count})</h3>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-muted)" }}>These interactions received poor ratings and are flagged for NLP improvement.</p>
           {retrain.candidates.map((c, i) => (
-            <div key={i} style={{ padding: 12, background: "#0b0f19", border: "1px solid #1e293b", borderRadius: 8, marginBottom: 8 }}>
+            <div key={i} style={{ padding: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#f8fafc", fontWeight: 500 }}>"{c.user_message}"</span>
-                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#350a0a", color: "#f87171", fontWeight: 600 }}>
+                <span style={{ fontSize: 12, color: "var(--text-primary)", fontWeight: 500 }}>"{c.user_message}"</span>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.12)", color: "#f87171", fontWeight: 600 }}>
                   Rating: {c.rating}/5
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b" }}>
-                <span>Intent: <strong style={{ color: "#94a3b8" }}>{c.detected_intent}</strong></span>
-                <span>Confidence: <strong style={{ color: "#94a3b8" }}>{c.confidence_score}%</strong></span>
-                <span>Source: <strong style={{ color: "#94a3b8" }}>{c.response_source}</strong></span>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)" }}>
+                <span>Intent: <strong style={{ color: "var(--text-secondary)" }}>{c.detected_intent}</strong></span>
+                <span>Confidence: <strong style={{ color: "var(--text-secondary)" }}>{c.confidence_score}%</strong></span>
+                <span>Source: <strong style={{ color: "var(--text-secondary)" }}>{c.response_source}</strong></span>
               </div>
-              {c.comment && <div style={{ marginTop: 4, fontSize: 11, color: "#a16207", fontStyle: "italic" }}>"{c.comment}"</div>}
+              {c.comment && <div style={{ marginTop: 4, fontSize: 11, color: "#d97706", fontStyle: "italic" }}>"{c.comment}"</div>}
             </div>
           ))}
         </div>
@@ -790,9 +958,9 @@ export default function App() {
     setToken(null);
   }
 
-  if (!isAuthenticated) return <LoginPage onSuccess={handleLoginSuccess} />;
-
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  if (!isAuthenticated) return <LoginPage onSuccess={handleLoginSuccess} />;
 
   const send = async () => {
     if (!input.trim() || loading) return;
@@ -828,88 +996,108 @@ export default function App() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#020617", color: "#f8fafc", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-        input:focus { outline: none; } button:hover { opacity: 0.9; }
-      `}</style>
+    <div style={{ minHeight: "100vh", background: "var(--bg-void)", color: "var(--text-primary)", fontFamily: "'Space Grotesk', system-ui, sans-serif", display: "flex", flexDirection: "column" }}>
 
       {/* Header */}
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #0f172a, #020617)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{
+        padding: "14px 24px",
+        borderBottom: "1px solid var(--border)",
+        background: "rgba(8,14,28,0.92)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        position: "sticky", top: 0, zIndex: 10
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #14b8a6, #3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{"\u{1F916}"}</div>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "linear-gradient(135deg, #06d6ff, #2563eb)",
+            boxShadow: "0 0 16px rgba(6,214,255,0.25)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17
+          }}>{"\u{1F916}"}</div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>Intelligent Support</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>NLP &bull; Database Verified &bull; Confidence Scoring &bull; Explainable AI</div>
+            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3, color: "var(--text-primary)" }}>Intelligent Support</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: 0.6, textTransform: "uppercase" }}>NLP · DB Verified · Confidence Scoring · XAI</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* View Toggle */}
-          <div style={{ display: "flex", background: "#0f172a", borderRadius: 8, overflow: "hidden", border: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", background: "var(--bg-surface)", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
             <button onClick={() => setView("chat")}
-              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "chat" ? "#14b8a6" : "transparent", color: view === "chat" ? "#fff" : "#64748b" }}>
+              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+                background: view === "chat" ? "rgba(6,214,255,0.15)" : "transparent",
+                color: view === "chat" ? "var(--accent-cyan)" : "var(--text-muted)",
+                borderRight: "1px solid var(--border)" }}>
               Chat
             </button>
             <button onClick={() => setView("dashboard")}
-              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "dashboard" ? "#14b8a6" : "transparent", color: view === "dashboard" ? "#fff" : "#64748b" }}>
+              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+                background: view === "dashboard" ? "rgba(6,214,255,0.15)" : "transparent",
+                color: view === "dashboard" ? "var(--accent-cyan)" : "var(--text-muted)" }}>
               Dashboard
             </button>
           </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
+            <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "var(--accent-cyan)" }} />
+            Live API
+          </label>
           {isAuthenticated && (
             <button onClick={handleLogout}
-              style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #1e293b", background: "transparent", color: "#94a3b8", cursor: "pointer" }}>
+              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 7,
+                border: "1px solid var(--border)", background: "transparent",
+                color: "var(--text-secondary)", cursor: "pointer",
+                transition: "border-color 0.2s, color 0.2s" }}>
               Logout
             </button>
           )}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
-            <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "#14b8a6" }} />
-            Live API
-          </label>
         </div>
       </div>
 
       {view === "chat" ? (
         <>
           {/* Quick Prompts */}
-          <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid #0b0f19" }}>
+          <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid var(--border)" }}>
             {quickPrompts.map((p, i) => (
-              <button key={i} onClick={() => setInput(p)} style={{ whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 20, border: "1px solid #1e293b", background: "#0b0f19", color: "#94a3b8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>{p}</button>
+              <button key={i} onClick={() => setInput(p)} className="prompt-pill">{p}</button>
             ))}
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 24px 8px" }}>
             {messages.map(msg => (
               <ChatMessage key={msg.id} msg={msg} explainOpen={explainStates[msg.id] || false} toggleExplain={() => toggleExplain(msg.id)} useMock={useMock} />
             ))}
             {loading && (
-              <div style={{ display: "flex", gap: 6, padding: 16 }}>
-                {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#14b8a6", animation: `pulse 1s ease infinite ${i * 0.15}s` }} />)}
+              <div style={{ display: "flex", gap: 7, padding: "12px 4px" }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent-cyan)", animation: `pulse 1s ease infinite ${i * 0.18}s` }} />
+                ))}
               </div>
             )}
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", background: "#0b0f19" }}>
+          {/* Input Bar */}
+          <div style={{ padding: "14px 24px 18px", borderTop: "1px solid var(--border)", background: "var(--bg-surface)" }}>
             <div style={{ display: "flex", gap: 10, maxWidth: 800, margin: "0 auto" }}>
               <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
                 placeholder="Ask about an order (ORD-100001), customer (CUST-001001), or describe your issue..."
-                style={{ flex: 1, padding: "12px 18px", borderRadius: 12, border: "1px solid #1e293b", background: "#0f172a", color: "#f8fafc", fontSize: 14, fontFamily: "inherit" }} />
+                className="chat-input"
+              />
               <button onClick={send} disabled={loading || !input.trim()}
-                style={{ padding: "12px 24px", borderRadius: 12, border: "none", background: loading || !input.trim() ? "#0f172a" : "linear-gradient(135deg, #2563eb, #3b82f6)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer" }}>
+                style={{
+                  padding: "13px 26px", borderRadius: "var(--r-lg)", border: "none",
+                  background: loading || !input.trim() ? "var(--bg-elevated)" : "linear-gradient(135deg, #0ea5ea, #2563eb)",
+                  color: loading || !input.trim() ? "var(--text-muted)" : "#fff",
+                  fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer",
+                  transition: "opacity 0.2s, box-shadow 0.2s",
+                  boxShadow: loading || !input.trim() ? "none" : "0 4px 16px rgba(6,214,255,0.20)"
+                }}>
                 Send
               </button>
             </div>
-            <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#475569" }}>
-              Transparent Confidence Scoring &bull; Database Verified Responses &bull; Click "Show AI Reasoning" for full breakdown
+            <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+              Transparent Confidence Scoring · Database Verified Responses · Click "Show AI Reasoning" for full breakdown
             </div>
           </div>
         </>

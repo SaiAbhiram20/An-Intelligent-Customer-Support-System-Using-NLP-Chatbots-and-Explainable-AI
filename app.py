@@ -791,6 +791,10 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
         dv = 1.0; dv_note = f"Response verified against database ({', '.join(db_ctx['lookups_performed'])})"
     elif db_ctx["errors"]:
         dv = 0.3; dv_note = f"ID provided but not found: {'; '.join(db_ctx['errors'])}"
+    elif is_conv_override:
+        # Short confirmations ("yes", "ok", "sure") carry implicit DB trust —
+        # the previous turn was DB-verified; the current reply continues that context.
+        dv = 0.7; dv_note = "Contextual confirmation — implied verification from conversation history"
     else:
         dv = 0.0; dv_note = "No database verification — no IDs provided in message"
     f5 = dv * 0.40
