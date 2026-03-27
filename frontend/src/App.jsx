@@ -36,26 +36,28 @@ const MOCK_DB = {
 function mockAPI(message, chatHistory = []) {
   const lower = message.toLowerCase();
   const upper = message.toUpperCase();
-  const tokens = lower.split(/\s+/);
+  // Strip punctuation before splitting so "terrible," matches "terrible"
+  const tokens = lower.replace(/[^\w\s-]/g, ' ').split(/\s+/).filter(Boolean);
 
-  // Extract IDs from current message
+  // Extract IDs from current message — matchAll gives every match; [-1] picks the most recent
   const ids = {};
-  let match;
-  if ((match = upper.match(/ORD-\d{5,7}/))) ids.order_id = match[0];
-  if ((match = upper.match(/CUST-\d{5,7}/))) ids.customer_id = match[0];
-  if ((match = upper.match(/TXN-\d{5,7}/))) ids.transaction_id = match[0];
+  const lastMatch = (str, pat) => { const all = [...str.matchAll(pat)]; return all.length ? all[all.length - 1][0] : null; };
+  const ordMatch  = lastMatch(upper, /ORD-\d{5,7}/g);  if (ordMatch)  ids.order_id       = ordMatch;
+  const custMatch = lastMatch(upper, /CUST-\d{5,7}/g); if (custMatch) ids.customer_id     = custMatch;
+  const txnMatch  = lastMatch(upper, /TXN-\d{5,7}/g);  if (txnMatch)  ids.transaction_id  = txnMatch;
 
-  // Fallback: scan recent history newest-first when current message has no IDs
-  if (!ids.order_id && !ids.customer_id && !ids.transaction_id) {
-    for (let i = chatHistory.length - 1; i >= 0; i--) {
-      const prev = chatHistory[i];
-      if (!prev || !prev.text) continue;
-      const prevUpper = prev.text.toUpperCase();
-      if (!ids.order_id && (match = prevUpper.match(/ORD-\d{5,7}/))) ids.order_id = match[0];
-      if (!ids.customer_id && (match = prevUpper.match(/CUST-\d{5,7}/))) ids.customer_id = match[0];
-      if (!ids.transaction_id && (match = prevUpper.match(/TXN-\d{5,7}/))) ids.transaction_id = match[0];
-      if (ids.order_id && ids.customer_id && ids.transaction_id) break;
-    }
+  // Partial merge from history: only user messages are scanned (bot responses
+  // would pollute context — they echo IDs the bot itself generated).
+  // Fill in any ID types still missing after parsing the current message.
+  const userHistory = chatHistory.filter(m => m.role === "user");
+  for (let i = userHistory.length - 1; i >= 0; i--) {
+    const prev = userHistory[i];
+    if (!prev?.text) continue;
+    const prevUpper = prev.text.toUpperCase();
+    if (!ids.order_id)      { const m = lastMatch(prevUpper, /ORD-\d{5,7}/g);  if (m) ids.order_id      = m; }
+    if (!ids.customer_id)   { const m = lastMatch(prevUpper, /CUST-\d{5,7}/g); if (m) ids.customer_id   = m; }
+    if (!ids.transaction_id){ const m = lastMatch(prevUpper, /TXN-\d{5,7}/g);  if (m) ids.transaction_id= m; }
+    if (ids.order_id && ids.customer_id && ids.transaction_id) break;
   }
 
   // Build context string from recent history for multi-turn flow detection
@@ -72,7 +74,8 @@ function mockAPI(message, chatHistory = []) {
   const posM = posW.filter(w => tokens.includes(w));
   const sentScore = posM.length > 0 && negM.length === 0 ? 0.6 : negM.length > 0 ? -0.7 : 0;
   const sentLabel = sentScore > 0.2 ? "positive" : sentScore < -0.2 ? "negative" : "neutral";
-  const intensity = Math.max(negM.length, posM.length) / Math.max(tokens.length, 1);
+  // Cap denominator at 3 so long sentences don't dilute strong sentiment signals
+  const intensity = Math.min(Math.max(negM.length, posM.length) / 3, 1.0);
 
   // Intent classification
   const intentDefs = {
@@ -102,7 +105,9 @@ function mockAPI(message, chatHistory = []) {
   // Database lookups
   let dbFound = false, dbLookups = [], dbErrors = [], dataUsed = [], dataVerified = false;
   let responseText = "", source = "fallback";
-  const empathy = sentLabel === "negative" && intensity > 0.15 ? "I understand this is frustrating, and I sincerely apologize. " : "";
+  const SUPPORT_INTENTS = ["billing","technical","account","shipping","order_status","refund","subscription"];
+  const empathy = sentLabel === "negative" && intensity > 0.35 && SUPPORT_INTENTS.includes(bestIntent)
+    ? "I understand this is frustrating, and I sincerely apologize. " : "";
 
   const order = ids.order_id ? MOCK_DB.orders[ids.order_id] : null;
   const customer = ids.customer_id ? MOCK_DB.customers[ids.customer_id] : null;
@@ -371,22 +376,52 @@ const DataBadge = ({ meta }) => {
 };
 
 const ExplainPanel = ({ data, isOpen, toggle }) => {
+  const [copied, setCopied] = useState(false);
   if (!data) return null;
   const db   = data.explainability?.database;
   const sent = data.explainability?.sentiment;
   const sentColor = sent?.label === "positive" ? "#10b981" : sent?.label === "negative" ? "#ef4444" : "#3b82f6";
   const sentBg    = sent?.label === "positive" ? "rgba(16,185,129,0.08)" : sent?.label === "negative" ? "rgba(239,68,68,0.08)" : "rgba(59,130,246,0.08)";
+
+  const copyBreakdown = () => {
+    const lines = [
+      `Confidence: ${data.confidence.score} (${data.confidence.level})`,
+      `Intent: ${data.explainability?.intent?.detected}`,
+      `Sentiment: ${sent?.label} (score ${sent?.score})`,
+      "",
+      "--- Factors ---",
+      ...(data.confidence.factors || []).map(f =>
+        `${f.name} [${f.weight}]: ${f.raw_score}% — ${f.explanation}`
+      )
+    ];
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
     <div style={{ marginTop: 10 }}>
-      <button onClick={toggle} style={{
-        background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
-        color: "#4a6a8a", fontSize: 12, padding: "5px 12px", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6,
-        transition: "border-color 0.2s, color 0.2s"
-      }}>
-        <span style={{ display: "inline-block", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s", fontSize: 10 }}>▶</span>
-        {isOpen ? "Hide" : "Show"} AI Reasoning
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={toggle} style={{
+          background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
+          color: "#4a6a8a", fontSize: 12, padding: "5px 12px", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+          transition: "border-color 0.2s, color 0.2s"
+        }}>
+          <span style={{ display: "inline-block", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s", fontSize: 10 }}>▶</span>
+          {isOpen ? "Hide" : "Show"} AI Reasoning
+        </button>
+        {isOpen && (
+          <button onClick={copyBreakdown} title="Copy breakdown" style={{
+            background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
+            color: copied ? "#10b981" : "#4a6a8a", fontSize: 11, padding: "5px 10px",
+            cursor: "pointer", transition: "color 0.2s, border-color 0.2s"
+          }}>
+            {copied ? "✓ Copied" : "⎘ Copy"}
+          </button>
+        )}
+      </div>
 
       {isOpen && (
         <div style={{
@@ -936,6 +971,7 @@ export default function App() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingLong, setLoadingLong] = useState(false);
   const [explainStates, setExplainStates] = useState({});
   const [useMock, setUseMock] = useState(true);
   const [view, setView] = useState("chat"); // "chat" | "dashboard"
@@ -943,6 +979,7 @@ export default function App() {
   const isAuthenticated = !!token;
   const [sessionId] = useState(() => crypto.randomUUID());
   const bottomRef = useRef(null);
+  const loadingTimerRef = useRef(null);
 
   function handleLoginSuccess(newToken) {
     localStorage.setItem("admin_token", newToken);
@@ -968,6 +1005,11 @@ export default function App() {
     setMessages(p => [...p, userMsg]);
     setInput("");
     setLoading(true);
+    setLoadingLong(false);
+    // Show "Connecting to database..." after 1.5 s only for live API calls
+    if (!useMock) {
+      loadingTimerRef.current = setTimeout(() => setLoadingLong(true), 1500);
+    }
     try {
       let data;
       if (useMock) {
@@ -981,7 +1023,9 @@ export default function App() {
     } catch {
       setMessages(p => [...p, { id: Date.now() + 1, role: "bot", text: "Error connecting to the server. Please try again.", apiData: null }]);
     }
+    clearTimeout(loadingTimerRef.current);
     setLoading(false);
+    setLoadingLong(false);
   };
 
   const toggleExplain = (id) => setExplainStates(p => ({ ...p, [id]: !p[id] }));
@@ -1068,10 +1112,17 @@ export default function App() {
               <ChatMessage key={msg.id} msg={msg} explainOpen={explainStates[msg.id] || false} toggleExplain={() => toggleExplain(msg.id)} useMock={useMock} />
             ))}
             {loading && (
-              <div style={{ display: "flex", gap: 7, padding: "12px 4px" }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent-cyan)", animation: `pulse 1s ease infinite ${i * 0.18}s` }} />
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px" }}>
+                <div style={{ display: "flex", gap: 7 }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent-cyan)", animation: `pulse 1s ease infinite ${i * 0.18}s` }} />
+                  ))}
+                </div>
+                {loadingLong && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", animation: "fadeIn 0.4s ease" }}>
+                    Connecting to database…
+                  </span>
+                )}
               </div>
             )}
             <div ref={bottomRef} />

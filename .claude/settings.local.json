@@ -26,7 +26,10 @@
       "WebFetch(domain:api.github.com)",
       "Bash(curl -s \"https://api.github.com/repos/garrytan/gstack/contents/.agents/skills\")",
       "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(d[''''name'''']\\) for d in data if d[''''type'''']==''''dir'''']\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(pip install:*)",
+      "Bash(\"C:/Users/user/Downloads/ASE/venv/Scripts/pip.exe\" install:*)",
+      "Bash(venv/Scripts/python.exe -m pytest test_app.py -v)"
     ]
   }
 }

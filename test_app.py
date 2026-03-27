@@ -105,6 +105,32 @@ class TestIDExtraction:
     def test_case_insensitive(self):
         assert extract_ids("order ord-100001") == {"order_id": "ORD-100001"}
 
+    def test_context_fallback_most_recent(self):
+        """When multiple IDs exist in history, the most recent one wins."""
+        context = "User asked about ORD-100001. Then user asked about ORD-100002."
+        ids = extract_ids("Where is it?", context)
+        assert ids.get("order_id") == "ORD-100002"
+
+    def test_context_fallback_oldest_not_returned(self):
+        """An older ID in history must NOT override a newer one."""
+        context = "ORD-100001 ORD-100003"
+        ids = extract_ids("follow up", context)
+        assert ids.get("order_id") == "ORD-100003"
+        assert ids.get("order_id") != "ORD-100001"
+
+    def test_partial_merge_keeps_current_message_id(self):
+        """If the current message has an order ID, history should not overwrite it."""
+        context = "User mentioned ORD-100001 earlier."
+        ids = extract_ids("What about ORD-100002?", context)
+        assert ids.get("order_id") == "ORD-100002"
+
+    def test_partial_merge_fills_missing_id_from_history(self):
+        """Current message has an order ID; customer ID should be pulled from history."""
+        context = "Customer CUST-001001 was verified."
+        ids = extract_ids("Refund for ORD-100002", context)
+        assert ids.get("order_id") == "ORD-100002"
+        assert ids.get("customer_id") == "CUST-001001"
+
 
 class TestGenuineResponse:
     """Test that responses are built from data, not canned."""

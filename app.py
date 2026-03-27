@@ -19,6 +19,8 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,7 +49,13 @@ except Exception as _ml_err:
 
 # ─── App ──────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["http://localhost:5173", "http://localhost:5000"])
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://"
+)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -128,7 +136,13 @@ def analyze_sentiment(proc: dict) -> dict:
     pos_matches, neg_matches, explanations = [], [], []
 
     for i, tok in enumerate(tokens):
-        negated = any(tokens[j] in NEGATORS for j in range(max(0, i-2), i))
+        # Look back up to 3 tokens for a negator, stopping at punctuation boundaries
+        lookback = []
+        for j in range(max(0, i - 3), i):
+            if tokens[j] in {",", ".", "!", "?", ";", ":"}:
+                break
+            lookback.append(j)
+        negated = any(tokens[j] in NEGATORS for j in lookback)
         intensified = any(tokens[j] in INTENSIFIERS for j in range(max(0, i-1), i))
         mult = 1.5 if intensified else 1.0
 
@@ -157,10 +171,23 @@ def analyze_sentiment(proc: dict) -> dict:
 
     return {
         "label": label, "score": round(score, 3),
-        "intensity": round(max(pos_score, neg_score) / max(len(tokens), 1), 3),
+        # Cap denominator at 3.0 so long sentences don't dilute strong sentiment signals
+        "intensity": round(min(max(pos_score, neg_score) / 3.0, 1.0), 3),
         "positive_matches": pos_matches, "negative_matches": neg_matches,
         "explanations": explanations
     }
+
+
+# ─── Lightweight Suffix Stemmer ──────────────────────────────
+
+def _stem(word: str) -> str:
+    """Strip common English suffixes to normalise tokens for intent matching.
+    Handles plurals, past tenses, gerunds, and agent forms without external deps.
+    """
+    for suffix in ("ations", "ation", "tions", "tion", "ing", "ers", "ed", "er", "ly", "ies", "es", "s"):
+        if word.endswith(suffix) and len(word) - len(suffix) >= 3:
+            return word[:-len(suffix)]
+    return word
 
 
 # ─── Intent Classification ───────────────────────────────────
@@ -180,6 +207,7 @@ INTENT_KEYWORDS = {
 
 def classify_intent(proc: dict) -> dict:
     tokens = set(proc["tokens"])
+    stemmed_tokens = {_stem(t) for t in tokens}
     text = proc["cleaned"]
     scores = {}
     match_details = {}
@@ -188,19 +216,25 @@ def classify_intent(proc: dict) -> dict:
         matched = []
         for kw in keywords:
             if ' ' in kw:
-                if kw in text: matched.append(kw)
+                if kw in text:
+                    matched.append(kw)
             elif kw in tokens:
                 matched.append(kw)
             else:
-                for t in tokens:
-                    if (t.startswith(kw) or kw.startswith(t)) and abs(len(t)-len(kw)) <= 3:
-                        matched.append(kw); break
+                # Stemmed match: stem both the token and keyword, then compare
+                kw_stem = _stem(kw)
+                if kw_stem in stemmed_tokens:
+                    matched.append(kw)
+                else:
+                    # Fallback prefix heuristic for very close forms
+                    for t in tokens:
+                        if (t.startswith(kw) or kw.startswith(t)) and abs(len(t) - len(kw)) <= 3:
+                            matched.append(kw)
+                            break
 
         if matched:
             n_matched = len(matched)
             n_keywords = len(keywords)
-            # Base coverage, but cap the denominator so large keyword lists
-            # aren't unfairly penalised for matching only a few terms.
             coverage = n_matched / min(n_keywords, 5)
             bonus = min(n_matched * 0.15, 0.4)
             scores[category] = round(min(coverage + bonus, 1.0), 3)
@@ -208,17 +242,27 @@ def classify_intent(proc: dict) -> dict:
 
     if not scores:
         return {"primary_intent": "unknown", "confidence": 0.0, "all_intents": [],
-                "matched_keywords": {}, "explanations": ["No keywords matched any category."]}
+                "matched_keywords": {}, "secondary_intent": None,
+                "explanations": ["No keywords matched any category."]}
 
     # Sort by score descending, then by specificity (fewer keywords = more specific = preferred on tie)
     sorted_intents = sorted(scores.items(), key=lambda x: (x[1], -len(INTENT_KEYWORDS[x[0]])), reverse=True)
     explanations = [f"'{cat}': matched [{', '.join(match_details[cat])}] → {s:.0%}" for cat, s in sorted_intents]
+
+    # Surface secondary_intent when top two scores are within 0.05 of each other (tie)
+    secondary = None
+    if len(sorted_intents) >= 2:
+        top_score = sorted_intents[0][1]
+        second_score = sorted_intents[1][1]
+        if top_score - second_score <= 0.05:
+            secondary = sorted_intents[1][0]
 
     return {
         "primary_intent": sorted_intents[0][0],
         "confidence": sorted_intents[0][1],
         "all_intents": [{"intent": i, "score": s} for i, s in sorted_intents],
         "matched_keywords": match_details,
+        "secondary_intent": secondary,
         "explanations": explanations
     }
 
@@ -240,16 +284,20 @@ def extract_ids(text: str, context_text: str = "") -> dict:
     }
     upper = text.upper()
     for key, pat in patterns.items():
-        m = re.search(pat, upper)
-        if m:
-            ids[key] = m.group(1)
+        matches = re.findall(pat, upper)
+        if matches:
+            ids[key] = matches[-1]
 
-    if not ids and context_text:
+    # Partial merge: fill in any ID types not found in the current message
+    # from history, so switching context retains companion IDs (e.g. customer
+    # ID found earlier is kept when a new order ID is mentioned).
+    if context_text:
         ctx_upper = context_text.upper()
         for key, pat in patterns.items():
-            m = re.search(pat, ctx_upper)
-            if m:
-                ids[key] = m.group(1)
+            if key not in ids:  # only fill gaps, never overwrite current message
+                matches = re.findall(pat, ctx_upper)
+                if matches:
+                    ids[key] = matches[-1]
 
     return ids
 
@@ -340,8 +388,15 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
     data_verified = False
 
     # ── Empathy prefix for frustrated users ──
+    # Only add empathy when frustration is meaningful (> 0.35) AND the intent is
+    # support-focused — prevents awkward apologies on neutral/conversational messages.
+    SUPPORT_INTENTS = {"billing", "technical", "account", "shipping", "order_status", "refund", "subscription"}
+    has_valid_entities = any(db_ctx["entities"].values())
+    is_support_context = primary in SUPPORT_INTENTS or has_valid_entities
     empathy = ""
-    if sentiment["label"] == "negative" and sentiment["intensity"] > 0.2:
+    if (sentiment["label"] == "negative"
+            and sentiment["intensity"] > 0.35
+            and is_support_context):
         empathy = "I understand this is frustrating, and I sincerely apologize for the inconvenience. "
 
     # ── DB errors (ID provided but not found) ──
@@ -356,10 +411,11 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
         }
 
     # ── Conversational bypass — takes priority over any DB context ──
-    CONVERSATIONAL_PHRASES = {"thank you", "thanks", "bye", "goodbye", "that's all",
-                               "that is all", "nothing else", "all good", "hello", "hi", "hey"}
+    CONVERSATIONAL_PHRASES_MULTI = {"thank you", "that's all", "that is all", "nothing else", "all good"}
+    CONVERSATIONAL_PHRASES_SINGLE = {"thanks", "bye", "goodbye", "hello", "hi", "hey"}
     is_conversational = primary in ("greeting", "thanks", "farewell") or \
-                        any(ph in text for ph in CONVERSATIONAL_PHRASES)
+                        any(ph in text for ph in CONVERSATIONAL_PHRASES_MULTI) or \
+                        any(ph in proc["tokens"] for ph in CONVERSATIONAL_PHRASES_SINGLE)
     if is_conversational:
         if primary == "greeting":
             return {
@@ -668,7 +724,27 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             "data_verified": False, "data_used": [], "source": "account_help"
         }
 
-    # ── Fallback ──
+    # ── Multi-intent fallback: two intents tied, address both ──
+    secondary = intent.get("secondary_intent")
+    if secondary and secondary != primary:
+        _INTENT_PROMPTS = {
+            "order_status": "order tracking (share an order ID, e.g. ORD-100001)",
+            "shipping":     "shipping & delivery (share an order ID, e.g. ORD-100001)",
+            "refund":       "refunds (share an order or transaction ID)",
+            "billing":      "billing & payments (share an order or transaction ID)",
+            "subscription": "subscriptions (share your customer ID, e.g. CUST-001001)",
+            "account":      "account management (share your customer ID, e.g. CUST-001001)",
+            "technical":    "technical issues (describe what's happening and any error messages)",
+        }
+        p_hint = _INTENT_PROMPTS.get(primary, primary)
+        s_hint = _INTENT_PROMPTS.get(secondary, secondary)
+        return {
+            "text": f"{empathy}It looks like your message may relate to both {p_hint} and {s_hint}. "
+                    f"Could you clarify which you need help with, or share the relevant ID so I can look into it right away?",
+            "data_verified": False, "data_used": [], "source": "multi_intent_fallback"
+        }
+
+    # ── Generic fallback ──
     return {
         "text": f"{empathy}I'm not fully sure I understand your request. I can help with: "
                 f"order tracking, refunds, billing, subscriptions, account management, and technical issues. "
@@ -839,9 +915,14 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 # HUMAN HANDOFF
 # ═══════════════════════════════════════════════════════════════
 
-def evaluate_handoff(confidence: dict, sentiment: dict) -> dict:
+_CONVERSATIONAL_INTENTS = {"greeting", "thanks", "farewell"}
+
+def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None) -> dict:
     reasons = []
-    if confidence["score"] < 35:
+    primary = (intent or {}).get("primary_intent", "unknown")
+    # Only escalate on low confidence for non-conversational intents — a greeting
+    # scoring < 35 is a classification edge case, not a genuine support failure.
+    if confidence["score"] < 35 and primary not in _CONVERSATIONAL_INTENTS:
         reasons.append("Low confidence in understanding your request")
     if sentiment["label"] == "negative" and sentiment["intensity"] > 0.6:
         reasons.append("Detected high frustration — a human agent can provide better support")
@@ -874,12 +955,16 @@ def health():
 
 
 @app.route('/api/chat', methods=['POST'])
+@limiter.limit("30 per minute")
 def chat():
     data = request.get_json()
     if not data or not data.get('message', '').strip():
         return jsonify({"error": "No message provided"}), 400
 
     msg = data['message'].strip()
+    if len(msg) > 2000:
+        return jsonify({"error": "Message too long. Please keep your message under 2,000 characters."}), 400
+
     session_id = data.get('session_id', str(uuid.uuid4()))
 
     # ── NLP Pipeline ──
@@ -905,12 +990,12 @@ def chat():
     else:
         sentiment = analyze_sentiment(proc)
         intent    = classify_intent(proc)
-    context   = get_recent_session_messages(session_id) or ""
+    context   = (get_recent_session_messages(session_id) or "")[-4000:]  # cap to last ~20 turns
     ids       = extract_ids(msg, context)
     db_ctx    = gather_db_context(ids, intent["primary_intent"])
     response  = build_genuine_response(intent, sentiment, proc, db_ctx, ids, context)
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
-    handoff   = evaluate_handoff(confidence, sentiment)
+    handoff   = evaluate_handoff(confidence, sentiment, intent)
 
     result = {
         "session_id": session_id,

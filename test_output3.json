@@ -1,0 +1,135 @@
+{
+  "confidence": {
+    "description": "I'm moderately confident. The response should be helpful, but providing an order/customer ID would let me give a more precise answer.",
+    "factors": [
+      {
+        "explanation": "ML model probability for 'unknown': 24.9%",
+        "name": "Intent Match Strength",
+        "raw_score": 24.9,
+        "weight": "20%",
+        "weighted_score": 5.0
+      },
+      {
+        "explanation": "ML probability gap: top=24.9% vs next=12.0%",
+        "name": "Intent Clarity",
+        "raw_score": 52.0,
+        "weight": "10%",
+        "weighted_score": 5.2
+      },
+      {
+        "explanation": "Detailed (13 tokens)",
+        "name": "Query Specificity",
+        "raw_score": 90.1,
+        "weight": "15%",
+        "weighted_score": 13.5
+      },
+      {
+        "explanation": "Sentiment does not strongly align with intent",
+        "name": "Sentiment Alignment",
+        "raw_score": 50.0,
+        "weight": "15%",
+        "weighted_score": 7.5
+      },
+      {
+        "explanation": "Response verified against database (Looked up order ORD-100003)",
+        "name": "Data Verification",
+        "raw_score": 100.0,
+        "weight": "40%",
+        "weighted_score": 40.0
+      }
+    ],
+    "level": "medium",
+    "missing_information": [],
+    "score": 71.2
+  },
+  "explainability": {
+    "database": {
+      "data_found": true,
+      "errors": [],
+      "ids_extracted": {
+        "order_id": "ORD-100003"
+      },
+      "lookups_performed": [
+        "Looked up order ORD-100003"
+      ]
+    },
+    "intent": {
+      "all_candidates": [
+        {
+          "intent": "unknown",
+          "score": 0.2493620216846466
+        },
+        {
+          "intent": "billing",
+          "score": 0.11974553763866425
+        },
+        {
+          "intent": "refund",
+          "score": 0.10650281608104706
+        },
+        {
+          "intent": "greeting",
+          "score": 0.10231798887252808
+        },
+        {
+          "intent": "account",
+          "score": 0.10048066824674606
+        },
+        {
+          "intent": "technical",
+          "score": 0.08665692061185837
+        },
+        {
+          "intent": "order_status",
+          "score": 0.08448710292577744
+        },
+        {
+          "intent": "shipping",
+          "score": 0.07780838757753372
+        },
+        {
+          "intent": "subscription",
+          "score": 0.07263852655887604
+        }
+      ],
+      "detected": "unknown",
+      "explanations": [],
+      "matched_keywords": {}
+    },
+    "sentiment": {
+      "explanations": [
+        "ML model detected negative sentiment with 94.3% confidence."
+      ],
+      "intensity": 0.94,
+      "label": "negative",
+      "negative_signals": [],
+      "positive_signals": [],
+      "score": 0.94
+    }
+  },
+  "handoff": {
+    "agent_brief": {
+      "confidence": 71.2,
+      "frustration": 0.94,
+      "intent": "medium",
+      "sentiment": "negative"
+    },
+    "message": "I'd like to connect you with a human agent who can better assist you. I'll transfer our conversation so you won't need to repeat yourself.",
+    "reasons": [
+      "Detected high frustration \u2014 a human agent can provide better support"
+    ],
+    "recommended": true
+  },
+  "interaction_id": "49d8a6bb-ad8d-493b-a63c-68991983114e",
+  "response": "I understand this is frustrating, and I sincerely apologize for the inconvenience. Your order ORD-100003 is currently in transit. Tracking: 794644790132 via FedEx. Estimated delivery: 2026-02-08. Note: Weather delay in midwest distribution center Items: Smart Watch Series 5, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL, Mechanical Keyboard RGB, Ergonomic Mouse Pad XL. Total: $215.99.",
+  "response_meta": {
+    "data_used": [
+      "order:ORD-100003"
+    ],
+    "data_verified": true,
+    "source": "db_order_in_transit"
+  },
+  "session_id": "ea180ee4-1b5b-4dbd-ab5b-40ed6d18bc7f",
+  "timestamp": "2026-03-27T05:15:17.842851",
+  "user_message": "This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious"
+}
