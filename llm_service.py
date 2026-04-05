@@ -115,3 +115,4 @@ REFERENCE ANSWER (grounding — rephrase naturally, keep all data points accurat
         timeout=20,
     )
     return completion.choices[0].message.content.strip()
+
