@@ -156,3 +156,4 @@ CREATE INDEX IF NOT EXISTS idx_chat_interactions_session ON chat_interactions(se
 CREATE INDEX IF NOT EXISTS idx_chat_interactions_created ON chat_interactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_interaction ON feedback(interaction_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_retrain ON feedback(retrain_flag) WHERE retrain_flag = TRUE;
+
