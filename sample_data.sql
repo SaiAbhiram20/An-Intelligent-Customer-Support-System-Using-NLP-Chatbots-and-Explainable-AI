@@ -218,3 +218,4 @@ INSERT INTO transactions (transaction_id, customer_id, subscription_id, type, st
 SELECT 'TXN-300002', c.id, s.id, 'subscription', 'completed', 9.99, 'Mastercard ending 5555', 'Monthly Basic subscription', '2026-02-15'
 FROM customers c JOIN subscriptions s ON s.subscription_id='SUB-001002' WHERE c.customer_id='CUST-001002'
 ON CONFLICT (transaction_id) DO NOTHING;
+
