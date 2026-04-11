@@ -697,6 +697,115 @@ const IntentBar = ({ intent, count, max }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
+   DASHBOARD LOGIN MODAL
+   ═══════════════════════════════════════════════════════════════ */
+function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    if (useMock) {
+      if (!username.trim() || !password.trim()) {
+        setError("Please enter a username and password");
+        setLoading(false);
+        return;
+      }
+      await new Promise(r => setTimeout(r, 300));
+      onSuccess("mock-admin-token");
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onSuccess(data.token);
+      } else {
+        setError(data.error || "Invalid credentials");
+      }
+    } catch {
+      setError("Could not reach server.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 100,
+      background: "rgba(4,8,15,0.80)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      display: "flex", alignItems: "center", justifyContent: "center"
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 380, padding: "0 24px",
+        animation: "slideUp 0.25s ease"
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#e2eeff" }}>Admin Access Required</div>
+          <div style={{ fontSize: 13, color: "#4a6a8a", marginTop: 4 }}>Sign in to view the dashboard</div>
+        </div>
+        <div style={{
+          background: "rgba(12,20,34,0.90)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(139,92,246,0.25)",
+          borderRadius: 20,
+          padding: "28px 28px 24px",
+          boxShadow: "0 8px 48px rgba(0,0,0,0.6)"
+        }}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
+              <input
+                value={username} onChange={e => setUsername(e.target.value)}
+                autoFocus required placeholder="Enter admin username"
+                className="login-input"
+              />
+            </div>
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
+              <input
+                type="password" value={password} onChange={e => setPassword(e.target.value)}
+                required placeholder="Enter admin password"
+                className="login-input"
+              />
+            </div>
+            {error && (
+              <div style={{
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16
+              }}>
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={loading} className="btn-primary"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}>
+              {loading ? "Signing in…" : "Access Dashboard →"}
+            </button>
+          </form>
+          <button onClick={onCancel}
+            style={{ marginTop: 14, width: "100%", padding: "10px", fontSize: 13, fontWeight: 500,
+              border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, cursor: "pointer",
+              background: "transparent", color: "#4a6a8a" }}>
+            Cancel — stay in chat
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    LOGIN PAGE
    ═══════════════════════════════════════════════════════════════ */
 function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
