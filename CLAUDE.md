@@ -94,3 +94,12 @@ Required variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `
 ## Testing Notes
 
 Tests in `test_app.py` import NLP functions directly from `app.py` and use Flask's `test_client`. Most tests do **not** require a live database — only `TestAPI::test_chat_with_order_id` would return a meaningful DB result if connected. The `@db_operation` decorator ensures DB tests fail gracefully when the pool is uninitialized.
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `python3 -c "from graphify.watch import _rebuild_code; from pathlib import Path; _rebuild_code(Path('.'))"` to keep the graph current

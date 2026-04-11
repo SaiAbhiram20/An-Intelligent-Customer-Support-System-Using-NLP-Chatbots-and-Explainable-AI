@@ -1,0 +1,95 @@
+id,session_id,user_message,detected_intent,confidence_score,response_source,handoff_recommended,created_at
+2bb118e7-1010-4efa-b8a3-c724d62fc87b,b52459a2-f0e5-43d2-8c28-584ff8dae89c,what are the details for ORD-100001,unknown,45.5,db_order_delivered,False,2026-03-23 17:58:58.954328-05:00
+73f8ad7b-3866-4089-ac6b-103848ba1fd8,1ecc63f8-c14d-40f9-a1c2-5ced1e585bc0,what is order ORD-100001,order_status,47.3,db_order_delivered,False,2026-03-23 18:02:45.547121-05:00
+b8fc9e72-107c-41fe-b4a9-b550783b41ac,f4ea1039-f278-43e2-9255-4a8f8c5cb3d8,what is order ORD-100001,order_status,47.3,db_order_delivered,False,2026-03-23 18:15:15.379498-05:00
+23f68ffc-8300-4fc7-a420-77f4805ec401,5983a4b5-20bd-49e6-a2cd-96291c6de420,Hello,greeting,32.0,greeting,True,2026-03-23 18:27:51.886501-05:00
+69c54a17-97ba-49d7-94bb-62098b679c21,40be9b9f-39a3-4f01-8229-8d9b6cdbb159,Status of ORD-100001,order_status,73.5,db_order_delivered,False,2026-03-23 18:27:51.901834-05:00
+44b4b3fb-498d-40d1-852c-77c9227cf329,626c1a3e-047a-4a05-a5fb-582ec40cc3d0,Hello,greeting,32.0,greeting,True,2026-03-23 18:28:57.509159-05:00
+3b196a1a-67a1-4ab9-8c85-0691b2163419,52178521-8b5c-4e5d-ba88-2f4255f85ca9,Status of ORD-100001,order_status,73.5,db_order_delivered,False,2026-03-23 18:28:57.523610-05:00
+ebc1ba24-24e7-4da4-a2b4-abd45e5c10c3,9dacfe10-a956-4bbf-8740-cdc7b896566c,Hello,greeting,34.2,greeting,True,2026-03-23 22:23:07.602774-05:00
+2d4c2a93-adc5-45f5-a2ae-bc420e6761ed,80bc7c46-49bd-4818-bf6a-5acc58e5a20d,Status of ORD-100001,order_status,74.0,db_order_delivered,False,2026-03-23 22:23:07.669907-05:00
+8109cfc3-cc53-4f11-9548-e4bdc8e77e06,2286d24b-b40a-4076-b3d2-b40b940232a0,Hello,greeting,34.2,greeting,True,2026-03-23 22:24:10.776932-05:00
+149485a0-7e4a-4aaf-a3c3-6a942b7cf8e5,f01bf902-d035-40b8-afd8-3eb3dc5e500c,Status of ORD-100001,order_status,74.0,db_order_delivered,False,2026-03-23 22:24:10.793962-05:00
+5e2c3ba6-2543-44b1-b58e-9590ca25ac67,4ec1e077-6308-48dc-b584-c934d71af159,what is order ORD-100001,order_status,65.0,db_order_delivered,False,2026-03-23 22:26:44.781789-05:00
+1a1349fc-f593-4656-b822-78430b84afc8,1140a8e2-e6a0-4346-9ff7-8ac67b849cc9,Hello,greeting,34.2,greeting,True,2026-03-23 22:40:20.730448-05:00
+ef82fff9-d2ec-4c84-8f80-650e0f6befd5,5354c47a-6edb-47ff-ab74-678207dc55bd,Status of ORD-100001,order_status,74.0,db_order_delivered,False,2026-03-23 22:40:20.750620-05:00
+ea8e9898-7be4-41ea-9953-4b3616568fbb,2dae370c-cb63-410d-847e-90621740e2af,Check transaction TXN-200001,unknown,57.0,db_transaction,False,2026-03-23 23:18:29.423440-05:00
+8c0c020e-4ffc-415f-aecb-4dbfb99d0075,4124453b-3b21-4284-8148-ed041ab3cc3e,Check transaction TXN-200001,unknown,57.0,db_transaction,False,2026-03-23 23:22:20.392353-05:00
+ea8036da-d203-4cd2-a5b3-b391ec19d50e,e409c82b-6157-4534-8771-a7967f7dfcda,yes,unknown,14.2,fallback,True,2026-03-23 23:22:31.556692-05:00
+5154f041-c638-40e6-b2ec-767a562864a5,2a50ea5b-a8b6-4fcd-8cbb-14d05f8f3c3c,Check transaction TXN-200001,unknown,57.0,db_transaction,False,2026-03-23 23:22:47.281890-05:00
+38a3abf0-54e0-4c03-9634-b5dfb7d66c94,12fb56e5-2fef-4b9b-a8b4-d668dd86d756,yes i would like know about the above transaction,unknown,21.7,fallback,True,2026-03-23 23:23:05.595952-05:00
+18e9bcaa-0aaa-4924-a208-ad7caee045f2,51681593-917e-4b5b-a4bd-e63a1779ebf7,Check transaction TXN-200001,unknown,57.0,db_transaction,False,2026-03-23 23:29:59.236191-05:00
+c5f25fad-aed6-4b45-9611-e67123bc64c1,51681593-917e-4b5b-a4bd-e63a1779ebf7,yes I would like to know about this transaction?,unknown,61.7,db_transaction,False,2026-03-23 23:30:19.106106-05:00
+6465e6d7-e82e-42f3-93e4-3563af96b3fc,51681593-917e-4b5b-a4bd-e63a1779ebf7,I want the refund for the above order,refund,68.1,db_transaction,False,2026-03-23 23:30:41.316139-05:00
+8eacda90-9890-416a-a301-8dbb98c4f1a7,a34b6392-5b1f-4b86-b78b-6b4cc523ae98,Check transaction TXN-200001,unknown,57.0,db_transaction,False,2026-03-23 23:36:20.928633-05:00
+b3a062a8-1242-471f-b45b-5c256c52c701,a34b6392-5b1f-4b86-b78b-6b4cc523ae98,I want the refund for the above order,refund,68.1,db_txn_refund_eligible,False,2026-03-23 23:36:39.897203-05:00
+273f6292-aae8-4bd9-a6ba-ee6527ae43bd,a34b6392-5b1f-4b86-b78b-6b4cc523ae98,yes can you initiate the refund,refund,66.7,db_txn_refund_eligible,False,2026-03-23 23:36:55.575554-05:00
+a21e0bc0-2305-4dd6-9888-730070410bb7,afa1c2b1-a4eb-4e93-b81f-3086fd9b5d7d,Hello,greeting,44.7,greeting,False,2026-03-24 12:01:26.804947-05:00
+c28cfbe6-1cad-4c85-88af-e4ed5ce72861,ea2dbd0b-167a-4d88-ae58-30689d2f948d,Status of ORD-100001,order_status,68.2,db_order_delivered,False,2026-03-24 12:01:28.109456-05:00
+af6d6ee0-743a-4682-9d99-3deedb9bd03a,93501be5-ed95-42ef-aeb4-4c72e7ae2850,Hello,greeting,34.2,greeting,True,2026-03-24 12:24:54.986213-05:00
+9492ca07-67c2-4483-96b0-17d25882d232,21afc9b0-83dd-40ee-9a1b-4c4fbb082a05,Status of ORD-100001,order_status,74.0,db_order_delivered,False,2026-03-24 12:24:55.002286-05:00
+53d3402e-9e91-41de-99ce-2db53fee74e9,69390c39-a79a-4bbe-9237-3c8757a8f08e,Show me customer CUST-001004,account,82.7,db_customer_overview,False,2026-03-24 12:28:28.750030-05:00
+b47e3644-4142-42bd-b2f0-456b3049825f,69390c39-a79a-4bbe-9237-3c8757a8f08e,I want a refund for ORD-100002,refund,82.8,db_refund_eligible,False,2026-03-24 12:29:15.768301-05:00
+cacf03f1-d4b2-47e7-a8ab-8743eaa052e7,69390c39-a79a-4bbe-9237-3c8757a8f08e,What is the status of ORD-100001?,unknown,77.2,db_order_delivered,False,2026-03-24 12:29:23.668801-05:00
+4eaf037d-6a19-4bd1-be22-d4d6d2d3cdfb,69390c39-a79a-4bbe-9237-3c8757a8f08e,Show me customer CUST-001004,account,82.7,db_customer_overview,False,2026-03-24 12:29:34.126180-05:00
+25798913-5931-4efe-8f65-b24a224e0d44,69390c39-a79a-4bbe-9237-3c8757a8f08e,"I'm frustrated, my package is late",shipping,89.1,db_order_delivered,True,2026-03-24 12:29:44.854833-05:00
+cbabaa29-7d5c-4076-8c1a-406831cc27c4,949e99c7-874f-43c7-9921-a893dfa7154c,Hello,unknown,17.6,fallback,True,2026-03-24 12:38:39.141767-05:00
+8fd3a81a-f1d0-46ec-b5b1-094fbe3dd9fc,d13a5448-b332-4655-9986-4e68632b67a6,Status of ORD-100001,unknown,60.5,db_order_delivered,False,2026-03-24 12:38:39.355281-05:00
+bc0d5845-04d9-46f0-b723-67b0ebb1836c,fd7f9ad5-0105-4a8a-9a75-74858f1ac7c8,Where is my order ORD-100003?,unknown,67.9,db_order_in_transit,False,2026-03-24 12:40:07.770922-05:00
+8b36aa84-598e-4938-8ded-8eef351d9630,fd7f9ad5-0105-4a8a-9a75-74858f1ac7c8,what is my order ORD-100005,unknown,62.7,db_order_processing,False,2026-03-24 12:42:53.283420-05:00
+b43d6107-4064-4b29-898d-3245006fd416,fd7f9ad5-0105-4a8a-9a75-74858f1ac7c8,Can I cancel that order,unknown,62.5,db_order_in_transit,False,2026-03-24 12:43:11.900754-05:00
+c29a93c9-15df-4e14-aa6c-28e7112a2aad,d645822a-7cb5-45b1-8bd0-8d3014fa7baf,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-24 22:22:47.984978-05:00
+d38206ea-e4e9-40e2-970a-7137df0bcdba,d645822a-7cb5-45b1-8bd0-8d3014fa7baf,yes proceed with the refund,unknown,62.7,db_order_delivered,False,2026-03-24 22:23:08.776649-05:00
+1cd5a18a-9100-44b3-b3d0-f8ebc14bef52,d645822a-7cb5-45b1-8bd0-8d3014fa7baf,can i get the refund for the order,unknown,65.1,db_order_delivered,False,2026-03-24 22:23:40.119468-05:00
+da6f077b-bfe7-42a8-adea-c50f10a75658,044ae4fc-97e3-490c-b868-b990c125791c,Hello,unknown,17.6,fallback,True,2026-03-24 22:28:31.446121-05:00
+d9d25241-af3c-44e5-9275-0b78f412fd52,790a990e-4453-47f4-abfb-05d918274144,Status of ORD-100001,unknown,60.5,db_order_delivered,False,2026-03-24 22:28:31.650084-05:00
+62cfa0ef-053a-4401-b07b-ab4bcabc513a,ebeca30c-5dbd-4d73-a167-debe9057f11c,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-24 22:29:14.953403-05:00
+f7904e6f-c4a5-4ca2-999d-6ad7690f7723,ebeca30c-5dbd-4d73-a167-debe9057f11c,yes please proceed with the refund,unknown,63.6,db_refund_eligible,False,2026-03-24 22:29:32.644879-05:00
+abd6d998-0a71-43be-b63e-6fbb5d43a440,ebeca30c-5dbd-4d73-a167-debe9057f11c,yes,unknown,61.7,db_order_delivered,False,2026-03-24 22:29:43.256793-05:00
+110c3a71-6a79-471c-977f-a937be0204ad,ccbbae53-0124-46ef-a3a7-00939ee3fe85,Hello,unknown,17.6,fallback,True,2026-03-24 22:33:57.008959-05:00
+bca45c4f-f18a-4fd1-911e-4e8b0a07816b,0087b70b-9974-4bb8-b879-69b8c8fe72d3,Status of ORD-100001,unknown,60.5,db_order_delivered,False,2026-03-24 22:33:57.209021-05:00
+5a717bd3-f759-419d-a3f9-665a2ceb2865,f6f34b86-b10f-405f-9827-099f5eafe606,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-24 22:39:07.153078-05:00
+9777dae1-e08e-4def-bf8e-90a9cff2cdce,f6f34b86-b10f-405f-9827-099f5eafe606,yes can i get the refund,unknown,63.0,db_refund_processed,False,2026-03-24 22:39:20.523125-05:00
+231e8dc5-d940-4631-b1ad-3e30a4afa1f3,f6f34b86-b10f-405f-9827-099f5eafe606,thats all thank you,unknown,58.5,db_order_delivered,False,2026-03-24 22:39:35.807352-05:00
+d73f27ae-981e-45b5-b108-346837d85baa,40f9cc3d-e26d-47c2-a890-8ff37df2d1b6,Hello,unknown,17.6,thanks,True,2026-03-24 22:44:32.029382-05:00
+fe11a453-4bee-407d-bce6-b1952c1f1593,8213356e-cd82-4272-bbb0-68737d6ddd76,Status of ORD-100001,unknown,60.5,db_order_delivered,False,2026-03-24 22:44:32.245407-05:00
+3eae3868-a855-437e-b2b7-ccb5ba716274,2ad4ad15-f63b-470e-83ed-dafd1c5f20e9,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-24 22:45:02.902073-05:00
+06782f4d-d76e-423c-8297-91de90ddeb3d,2ad4ad15-f63b-470e-83ed-dafd1c5f20e9,yes,unknown,61.7,db_refund_processed,False,2026-03-24 22:45:08.667594-05:00
+19a9a12e-f516-4dc7-a976-2ebdbd28279e,2ad4ad15-f63b-470e-83ed-dafd1c5f20e9,thank you,unknown,55.7,thanks,False,2026-03-24 22:45:44.295247-05:00
+852bb435-9dd1-4605-9e6e-c6407ff7db89,deece5e4-6d22-45b5-8291-572574e4ae3a,Hello,unknown,17.6,thanks,True,2026-03-24 22:50:09.933738-05:00
+0c505185-73ab-4b15-9f64-97b64d46b010,2def86ef-9598-4c44-b272-054d6be7baa2,Status of ORD-100001,unknown,60.5,db_order_delivered,False,2026-03-24 22:50:10.138042-05:00
+6120ed2a-915d-4590-9a20-d8860c0fddf6,328bb592-def5-4015-aa5d-45ab987fd16d,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-24 22:51:50.925547-05:00
+a6f3a107-f2f2-4ff1-a40d-d1141e111c93,328bb592-def5-4015-aa5d-45ab987fd16d,yes,unknown,92.5,db_refund_processed,False,2026-03-24 22:51:54.307332-05:00
+b76ad5e5-cbb3-4de7-829d-662c0e604fe2,328bb592-def5-4015-aa5d-45ab987fd16d,thank you,unknown,92.5,thanks,False,2026-03-24 22:52:04.727722-05:00
+87858c2e-d11c-457b-bcc3-c65447ccae68,c4ebfdc0-dc94-420f-87f5-35fd7b392484,I want a refund for ORD-100002,refund,67.1,db_refund_eligible,False,2026-03-25 22:56:58.842449-05:00
+a73ca2d0-0493-4833-96f5-a7e4ba28547e,c4ebfdc0-dc94-420f-87f5-35fd7b392484,yes,unknown,92.5,db_refund_processed,False,2026-03-25 22:57:09.370475-05:00
+135279be-fe26-49ac-a3c8-e534b7d2d9d4,c4ebfdc0-dc94-420f-87f5-35fd7b392484,What is the status of ORD-100001?,unknown,69.3,db_order_delivered,False,2026-03-25 22:57:18.955969-05:00
+44b9b220-b9f8-4b7d-9372-53dc8cc36a92,c4ebfdc0-dc94-420f-87f5-35fd7b392484,can i get a refund,unknown,62.3,db_refund_eligible,False,2026-03-25 22:57:29.123561-05:00
+65ceb172-37e3-4ee5-a8bd-42de3549df8a,d08032d5-e874-4bad-970f-c8572e211a1f,Hello,greeting,34.2,greeting,False,2026-03-26 22:45:20.584260-05:00
+be21a69f-6ee4-4f22-9245-8f19bf86fec5,c1dddd04-ff13-484f-abe7-354f3b656f1e,Status of ORD-100001,order_status,74.0,db_order_delivered,False,2026-03-26 22:45:20.660439-05:00
+214f3c5a-da19-460d-9d00-de95af7f5557,fead3dff-a51c-4a7a-b514-195b4ae890dc,What is the status of ORD-100001?,unknown,75.8,db_order_delivered,False,2026-03-26 23:20:39.050076-05:00
+906665fd-cad8-4d4a-a799-665b447bc672,fead3dff-a51c-4a7a-b514-195b4ae890dc,Can I get a refund for ORD-100002?,unknown,75.2,db_refund_eligible,False,2026-03-26 23:21:23.012243-05:00
+c8625d8b-ca6a-436e-af04-2a1dd18d48fd,fead3dff-a51c-4a7a-b514-195b4ae890dc,Is it eligible?,unknown,71.8,db_order_delivered,False,2026-03-26 23:21:41.542141-05:00
+24cf64e5-9046-40f4-8aec-80142bee816b,fead3dff-a51c-4a7a-b514-195b4ae890dc,i want a refund for it,unknown,68.8,db_refund_eligible,True,2026-03-26 23:22:23.652447-05:00
+97b2fe3d-2f7d-4ee1-a204-bbed559494e3,fead3dff-a51c-4a7a-b514-195b4ae890dc,yes,unknown,92.5,db_refund_processed,False,2026-03-26 23:22:35.252646-05:00
+3be92b5f-ca2c-4218-8f76-a214a29dc428,073b919e-6992-46e7-9e82-06ef63158fa6,Hello,unknown,25.1,thanks,True,2026-03-26 23:42:10.740226-05:00
+93ccacf1-03a9-48cf-9885-69cdb7748fa6,cdfed450-ea01-4bd6-9403-a77553d52849,Status of ORD-100001,unknown,65.5,db_order_delivered,False,2026-03-26 23:42:10.906108-05:00
+6df61614-5a3f-4911-938d-e6ae52387acb,b9f65804-32d1-40dc-a70e-c65abe12cd71,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,thanks,True,2026-03-26 23:50:59.891810-05:00
+08a62e9b-8def-4dbc-b268-d6b570535708,b9f65804-32d1-40dc-a70e-c65abe12cd71,My order is a bit slow,unknown,68.9,db_order_in_transit,True,2026-03-26 23:51:11.331416-05:00
+390ecf85-61b4-403f-a765-cc8f4b6c1332,417f3897-3b48-40d3-83c2-24900a52e618,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,thanks,True,2026-03-27 00:02:21.238746-05:00
+ac0287a9-6b96-4822-9cc0-f7d10e6a8677,aa83a379-3487-4778-9801-50b06b1bcda8,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:04:38.585679-05:00
+f721ffb6-7de5-4fa8-a977-993bd215bb49,186c8b1e-62fd-4e8a-8618-9f571de9318a,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:09:37.599752-05:00
+dffbac23-f400-4804-88fc-7cb7642fd587,179ffb4e-c64d-4a6d-86ba-978b3fea5dc6,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:09:54.339820-05:00
+cfcd553f-b267-4789-9802-1cd65feea5b4,6d572a6f-1eac-45c7-a06d-a8f9518ba882,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:10:06.357941-05:00
+98705d62-b215-4965-a49f-890d8c02a4cc,1ce7a0d0-6cdb-46c0-86ca-969ef20aaf29,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:14:09.619565-05:00
+7811e2ae-e31d-489e-9c43-e74d16d1cd2c,1d1218b7-68c3-4ac5-9de2-169abd6b4204,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:14:49.450294-05:00
+49d8a6bb-ad8d-493b-a63c-68991983114e,ea180ee4-1b5b-4dbd-ab5b-40ed6d18bc7f,"This is absolutely terrible, my package ORD-100003 still hasn't arrived and I'm furious",unknown,71.2,db_order_in_transit,True,2026-03-27 00:15:17.842938-05:00
+383d8de0-f376-40ff-ad29-329b30831c89,7ad88d14-8023-41d9-b066-20abd7e07887,I want a refund for ORD-100002,unknown,68.7,db_refund_eligible_llm,False,2026-03-31 14:28:54.015474-05:00
+bcb69e97-0d6c-4207-b6b3-8d5fb3b08599,7ad88d14-8023-41d9-b066-20abd7e07887,yes,unknown,92.5,db_refund_processed_llm,False,2026-03-31 14:29:11.331011-05:00
+323a800f-9700-4806-aeef-398225a9e9c8,7ad88d14-8023-41d9-b066-20abd7e07887,can you give me the refund,unknown,78.8,db_refund_eligible_llm,False,2026-03-31 14:29:35.244641-05:00
+16849a0c-26e7-425c-94f8-a4622ca0e226,7ad88d14-8023-41d9-b066-20abd7e07887,thank you,unknown,92.5,thanks,False,2026-03-31 14:29:55.726172-05:00
+0f3f79ff-0865-4d00-8bf6-39683d1258b6,dabc042c-9229-41a3-9f10-5c95d0d65647,"My item arrived cracked, order ORD-100001",shipping,78.7,db_damaged_product_llm,False,2026-04-08 14:45:27.403386-05:00
+68d33c9b-dc99-4d62-bbfd-a22b7dfdd723,dabc042c-9229-41a3-9f10-5c95d0d65647,"▎ I received the wrong product, order ORD-100001",wrong_order,79.4,db_wrong_order_llm,False,2026-04-08 14:45:57.622658-05:00
+5cfdbd35-be48-4db9-be44-8ce5b7331ac6,dabc042c-9229-41a3-9f10-5c95d0d65647,My card keeps getting declined at checkout,payment_failure,77.4,db_order_delivered_llm,False,2026-04-08 14:46:57.271779-05:00
+7c822117-92ba-4dd9-836e-5166732f83f2,dabc042c-9229-41a3-9f10-5c95d0d65647,ORD-100001,unknown,54.2,db_order_delivered_llm,False,2026-04-08 14:47:26.278727-05:00
+50861db2-e26d-46fa-a689-0616fd2e77da,dabc042c-9229-41a3-9f10-5c95d0d65647,Where is my order ORD-100001?,order_status,72.9,db_order_delivered_llm,False,2026-04-08 14:47:58.092007-05:00

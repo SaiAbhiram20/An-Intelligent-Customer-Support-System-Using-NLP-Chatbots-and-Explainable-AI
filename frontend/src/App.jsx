@@ -26,7 +26,8 @@ const MOCK_DB = {
   transactions: {
     "TXN-200001": {transaction_id:"TXN-200001",type:"charge",status:"completed",amount:161.99,payment_method:"Visa ending 4242",refund_eligible:true,refund_deadline:"2026-02-19",transaction_date:"2026-01-10",first_name:"Sarah"},
     "TXN-200002": {transaction_id:"TXN-200002",type:"charge",status:"completed",amount:92.38,payment_method:"Mastercard ending 5555",refund_eligible:true,refund_deadline:"2026-02-28",transaction_date:"2026-01-20",first_name:"Mike"},
-    "TXN-200003": {transaction_id:"TXN-200003",type:"charge",status:"completed",amount:215.99,payment_method:"Visa ending 1234",refund_eligible:true,transaction_date:"2026-02-01",first_name:"Emily"}
+    "TXN-200003": {transaction_id:"TXN-200003",type:"charge",status:"completed",amount:215.99,payment_method:"Visa ending 1234",refund_eligible:true,transaction_date:"2026-02-01",first_name:"Emily"},
+    "TXN-200004": {transaction_id:"TXN-200004",type:"charge",status:"completed",amount:92.38,payment_method:"Mastercard ending 5555",refund_eligible:true,refund_deadline:"2026-03-20",transaction_date:"2026-01-20",first_name:"Mike",is_duplicate:true,original_transaction:"TXN-200002"}
   }
 };
 
@@ -88,7 +89,8 @@ function mockAPI(message, chatHistory = []) {
     subscription:["subscription","plan","upgrade","downgrade","renew"],
     greeting:["hello","hi","help","hey"],
     thanks:["thanks","thank you","appreciate"],
-    farewell:["bye","goodbye"]
+    farewell:["bye","goodbye"],
+    duplicate_charge:["charged twice","double charged","duplicate charge","billed twice","charged again","two charges","extra charge","duplicate transaction"]
   };
   let bestIntent = "unknown", bestScore = 0, allIntents = [], matchedKws = {};
   for (const [cat, kws] of Object.entries(intentDefs)) {
@@ -183,6 +185,16 @@ function mockAPI(message, chatHistory = []) {
     }
   } else if (transaction) {
     dbFound = true; dataVerified = true; dataUsed.push(`txn:${transaction.transaction_id}`);
+
+    // Duplicate charge detection
+    const isDuplicateCharge = bestIntent === "duplicate_charge" || transaction.is_duplicate ||
+      ["charged twice","double charged","duplicate","billed twice","charged again","two charges","extra charge"].some(w => lower.includes(w));
+    if (isDuplicateCharge) {
+      const original = transaction.original_transaction || "a previous transaction";
+      responseText = `${empathy}I can see that transaction ${transaction.transaction_id} for $${transaction.amount} on your ${transaction.payment_method} appears to be a duplicate of ${original}. I've flagged this for immediate review and will initiate a full refund of $${transaction.amount} for the duplicate charge. You should see the reversal within 2-3 business days. We sincerely apologise for this error.`;
+      source = "db_duplicate_charge"; dbFound = true; dataVerified = true;
+    } else {
+
     const isRefundIntent = ["refund", "billing"].includes(bestIntent) ||
       REFUND_WORDS.some(w => lower.includes(w));
     if (isRefundIntent || (isConfirmation && inRefundFlow)) {
@@ -205,14 +217,32 @@ function mockAPI(message, chatHistory = []) {
       responseText = `${empathy}Transaction ${transaction.transaction_id} found: ${transaction.type} | ${transaction.status} | $${transaction.amount} | ${transaction.payment_method} | ${transaction.transaction_date}.${transaction.refund_eligible ? ` Refund eligible (deadline: ${transaction.refund_deadline}).` : ""}`;
       source = "db_transaction";
     }
+    } // end duplicate-charge else
   } else if (customer) {
     dbFound = true; dataVerified = true; dataUsed.push(`customer:${customer.customer_id}`);
     const orderList = customer.orders.map(oid => { const o = MOCK_DB.orders[oid]; return o ? `${oid} (${o.status}, $${o.total})` : oid; }).join("; ");
     const s = customer.subscription;
     if (bestIntent === "subscription" && s) {
-      const auto = s.auto_renew ? "auto-renews" : "does not auto-renew";
-      responseText = `${empathy}Subscription for account ${customer.customer_id}: ${s.plan_name.toUpperCase()} plan at $${s.plan_price}/${s.billing_cycle}. Status: ${s.status} — ${auto}. Would you like to upgrade, downgrade, or cancel?`;
-      source = "db_customer_subscription";
+      const PLAN_TIERS  = ["free","basic","pro","enterprise"];
+      const PLAN_PRICES = {free:0, basic:9.99, pro:29.99, enterprise:99.99};
+      const currentPlan = s.plan_name.toLowerCase();
+      const currentIdx  = PLAN_TIERS.indexOf(currentPlan);
+      const wantsUpgrade   = ["upgrade","higher","better plan","more features","move up"].some(w => lower.includes(w));
+      const wantsDowngrade = ["downgrade","lower","cheaper","reduce","smaller plan","less expensive","move down"].some(w => lower.includes(w));
+
+      if (wantsUpgrade && currentIdx >= 0 && currentIdx < PLAN_TIERS.length - 1) {
+        const options = PLAN_TIERS.slice(currentIdx + 1).map(p => `${p.toUpperCase()} ($${PLAN_PRICES[p]}/mo)`).join(" or ");
+        responseText = `${empathy}Your current plan is ${currentPlan.toUpperCase()} at $${s.plan_price}/${s.billing_cycle}. Available upgrades: ${options}. Upgrading takes effect immediately and the price difference will be prorated. Which plan would you like to switch to?`;
+        source = "db_subscription_upgrade_options";
+      } else if (wantsDowngrade && currentIdx > 0) {
+        const options = PLAN_TIERS.slice(0, currentIdx).reverse().map(p => `${p.toUpperCase()} ($${PLAN_PRICES[p]}/mo)`).join(" or ");
+        responseText = `${empathy}Your current plan is ${currentPlan.toUpperCase()} at $${s.plan_price}/${s.billing_cycle}. Available downgrades: ${options}. Downgrading takes effect at the start of your next billing cycle with no interruption. Which plan would you prefer?`;
+        source = "db_subscription_downgrade_options";
+      } else {
+        const auto = s.auto_renew ? "auto-renews" : "does not auto-renew";
+        responseText = `${empathy}Subscription for account ${customer.customer_id}: ${s.plan_name.toUpperCase()} plan at $${s.plan_price}/${s.billing_cycle}. Status: ${s.status} — ${auto}. Would you like to upgrade, downgrade, or cancel?`;
+        source = "db_customer_subscription";
+      }
     } else if (["order_status", "shipping"].includes(bestIntent) && customer.orders.length > 0) {
       responseText = `${empathy}Recent orders for account ${customer.customer_id}: ${orderList}. Share a specific order ID for full tracking details.`;
       source = "db_customer_orders";
@@ -237,8 +267,16 @@ function mockAPI(message, chatHistory = []) {
     responseText = `${empathy}Sorry about the issue! Could you describe: (1) what you were doing, (2) what happened, (3) any error messages?`; source = "technical_help";
   } else if (bestIntent === "account") {
     responseText = `${empathy}I can help with your account! Share your customer ID (e.g. CUST-001001).`; source = "account_help";
+  } else if (bestIntent === "duplicate_charge") {
+    responseText = `${empathy}I can investigate a duplicate charge for you! Please share the transaction ID (e.g. TXN-200004) and I'll check for duplicate charges on your account straight away.`; source = "needs_txn_for_duplicate";
   } else {
-    responseText = `${empathy}I can help with orders, refunds, billing, subscriptions, and accounts. Try sharing an order ID (ORD-XXXXXX) or customer ID!`; source = "fallback";
+    if (sentLabel === "negative" || intensity > 0.2) {
+      responseText = `${empathy}I'm sorry you're having trouble — I want to make sure I direct you correctly. Could you tell me if your issue relates to: (1) an order or delivery, (2) a charge or refund, (3) your account or subscription, or (4) a technical problem? Or share an order ID (e.g. ORD-100001) and I'll look it up right away.`;
+      source = "vague_complaint_clarify";
+    } else {
+      responseText = `${empathy}I'm here to help! I can assist with order tracking, refunds, billing, subscriptions, and account issues. Share an order ID (e.g. ORD-100001) or customer ID (e.g. CUST-001001) to get started.`;
+      source = "fallback";
+    }
   }
 
   // Confidence calculation with 5 factors (weights: 20/10/15/15/40)
@@ -1031,12 +1069,12 @@ export default function App() {
   const toggleExplain = (id) => setExplainStates(p => ({ ...p, [id]: !p[id] }));
 
   const quickPrompts = [
-    "What is the status of ORD-100001?",
+    "My order ORD-100003 hasn't arrived yet, it's stuck in transit",
     "I want a refund for ORD-100002",
-    "Where is my order ORD-100003?",
-    "Show me customer CUST-001004",
-    "Check transaction TXN-200001",
-    "I'm frustrated, my package is late"
+    "Can I cancel my order ORD-100004? It's still processing",
+    "I want to upgrade my plan, I'm CUST-001002",
+    "I think I was charged twice, check transaction TXN-200004",
+    "Something's wrong, I'm not sure what the issue is"
   ];
 
   return (

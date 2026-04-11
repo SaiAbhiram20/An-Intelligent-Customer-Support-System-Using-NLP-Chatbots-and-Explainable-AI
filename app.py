@@ -47,6 +47,20 @@ except Exception as _ml_err:
         f"ML service unavailable ({_ml_err}). Falling back to keyword-based NLP."
     )
 
+try:
+    import llm_service
+    # Verify the API key is present at startup so we fail fast rather than
+    # silently falling back on every request.
+    if not os.getenv("NVIDIA_API_KEY"):
+        raise ValueError("NVIDIA_API_KEY not configured")
+    LLM_AVAILABLE = True
+    logging.getLogger(__name__).info("LLM service loaded — NVIDIA NIM Llama 3.1 405B will handle response generation.")
+except Exception as _llm_err:
+    LLM_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        f"LLM service unavailable ({_llm_err}). Falling back to template responses."
+    )
+
 # ─── App ──────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://localhost:5000"])
@@ -193,16 +207,24 @@ def _stem(word: str) -> str:
 # ─── Intent Classification ───────────────────────────────────
 
 INTENT_KEYWORDS = {
-    "billing":   ["bill","charge","invoice","payment","price","cost","fee","subscription","plan","refund","money","overcharged","pricing"],
-    "technical": ["bug","error","crash","slow","broken","fix","issue","problem","not working","glitch","loading","fail","login","password","reset","down"],
-    "account":   ["account","profile","settings","email","name","delete","close","update","change","personal","data","privacy","deactivate"],
-    "shipping":  ["ship","deliver","track","order","package","arrive","return","exchange","lost","damaged","address","where is","dispatch"],
-    "order_status": ["order","status","where","tracking","shipped","delivered","processing","cancelled","when","eta","estimated"],
-    "refund":    ["refund","money back","return money","reimburse","credit","chargeback"],
-    "subscription": ["subscription","plan","upgrade","downgrade","cancel subscription","renew","billing cycle","monthly","annual"],
-    "greeting":  ["hello","hi","help","hey","good morning","good afternoon","good evening"],
-    "thanks":    ["thanks","thank you","appreciate","great help","wonderful"],
-    "farewell":  ["bye","goodbye","see you","that's all","done","nothing else"]
+    "billing":         ["bill","charge","invoice","payment","price","cost","fee","subscription","plan","refund","money","overcharged","pricing"],
+    "technical":       ["bug","error","crash","slow","broken","fix","issue","problem","not working","glitch","loading","fail","login","password","reset","down"],
+    "account":         ["account","profile","settings","email","name","delete","close","update","change","personal","data","privacy","deactivate"],
+    "shipping":        ["ship","deliver","track","order","package","arrive","return","exchange","lost","damaged","address","where is","dispatch"],
+    "order_status":    ["order","status","where","tracking","shipped","delivered","processing","cancelled","when","eta","estimated"],
+    "refund":          ["refund","money back","return money","reimburse","credit","chargeback"],
+    "subscription":    ["subscription","plan","upgrade","downgrade","cancel subscription","renew","billing cycle","monthly","annual"],
+    "greeting":        ["hello","hi","help","hey","good morning","good afternoon","good evening"],
+    "thanks":          ["thanks","thank you","appreciate","great help","wonderful"],
+    "farewell":        ["bye","goodbye","see you","that's all","done","nothing else"],
+    # ── New scenario intents (blueprint Part 1) ──────────────────
+    "damaged_product": ["broken","damaged","cracked","defective","smashed","scratched","shattered","arrived broken","dented","faulty","not working","arrived damaged"],
+    "wrong_order":     ["wrong","incorrect","different","not what i ordered","wrong item","wrong product","mix up","mistake","got the wrong","sent wrong","received wrong"],
+    "payment_failure": ["payment failed","card declined","declined","won't go through","not going through","payment error","checkout failed","cvv","billing address","payment method","try again","alternative payment"],
+    "missing_package": ["stolen","theft","porch","missing","not here","not received","says delivered","marked delivered","marked as delivered","cannot find","can't find","never arrived","didn't arrive"],
+    "product_inquiry": ["compatible","compatibility","specifications","specs","does it work","features","material","dimensions","in stock","availability","android","ios","bluetooth","warranty","size","weight","color"],
+    "address_change":  ["wrong address","change address","update address","entered wrong","incorrect address","new address","different address","shipping address","correct address"],
+    "duplicate_charge":["charged twice","double charged","duplicate charge","billed twice","charged again","two charges","extra charge","charged multiple","double billing","duplicate transaction"],
 }
 
 def classify_intent(proc: dict) -> dict:
@@ -390,7 +412,9 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
     # ── Empathy prefix for frustrated users ──
     # Only add empathy when frustration is meaningful (> 0.35) AND the intent is
     # support-focused — prevents awkward apologies on neutral/conversational messages.
-    SUPPORT_INTENTS = {"billing", "technical", "account", "shipping", "order_status", "refund", "subscription"}
+    SUPPORT_INTENTS = {"billing", "technical", "account", "shipping", "order_status", "refund", "subscription",
+                       "damaged_product", "wrong_order", "payment_failure", "missing_package", "product_inquiry",
+                       "address_change", "duplicate_charge"}
     has_valid_entities = any(db_ctx["entities"].values())
     is_support_context = primary in SUPPORT_INTENTS or has_valid_entities
     empathy = ""
@@ -485,6 +509,67 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
                     "data_verified": True, "data_used": data_used, "source": "db_refund_no_transaction"
                 }
 
+        # ── Damaged product ──
+        is_damaged_intent = primary == "damaged_product" or any(
+            w in text for w in ["broken", "damaged", "cracked", "defective", "smashed", "scratched", "shattered", "dented", "faulty"]
+        )
+        if is_damaged_intent:
+            return {
+                "text": f"{empathy}I'm incredibly sorry your order {order['order_id']} arrived in less-than-perfect condition — that's definitely not the experience we want for you. "
+                        f"Items: {items_str}. "
+                        f"To resolve this as quickly as possible, please upload a photo of the damage so our team can verify it. "
+                        f"Once confirmed, I can arrange a replacement shipment or issue a full refund of ${order['total']} — whichever you prefer.",
+                "data_verified": True, "data_used": data_used, "source": "db_damaged_product"
+            }
+
+        # ── Wrong order delivered ──
+        is_wrong_order_intent = primary == "wrong_order" or any(
+            w in text for w in ["wrong", "incorrect", "different", "not what i ordered", "mix up", "mistake", "sent wrong", "received wrong"]
+        )
+        if is_wrong_order_intent:
+            return {
+                "text": f"{empathy}I'm so sorry for the mix-up with order {order['order_id']} — that's not acceptable and I want to fix this right away. "
+                        f"Items we have on record: {items_str} (${order['total']}). "
+                        f"I'll generate a prepaid return label for the incorrect item and prioritise shipping your correct order immediately. "
+                        f"Could you briefly describe the item you received versus what you ordered?",
+                "data_verified": True, "data_used": data_used, "source": "db_wrong_order"
+            }
+
+        # ── Shipping address change ──
+        is_address_change = primary == "address_change" or any(
+            w in text for w in ["wrong address", "change address", "update address", "incorrect address", "new address", "different address"]
+        )
+        if is_address_change:
+            if order["status"] == "processing":
+                return {
+                    "text": f"{empathy}Good news — order {order['order_id']} is still in processing, so we may be able to update the address. "
+                            f"Please reply with the correct shipping address and I'll flag this for our warehouse team immediately. "
+                            f"Items: {items_str} | Total: ${order['total']}.",
+                    "data_verified": True, "data_used": data_used, "source": "db_address_change_possible"
+                }
+            else:
+                return {
+                    "text": f"{empathy}Unfortunately, order {order['order_id']} is already {order['status'].replace('_', ' ')} and the address can no longer be changed from our end. "
+                            f"I'd recommend contacting the carrier directly with your tracking number"
+                            + (f" ({order['tracking_number']} via {order['carrier']})" if order.get("tracking_number") else "")
+                            + f" to request a redirect. Is there anything else I can help with?",
+                    "data_verified": True, "data_used": data_used, "source": "db_address_change_too_late"
+                }
+
+        # ── Missing / stolen package (order shows delivered) ──
+        is_missing_intent = primary == "missing_package" or any(
+            w in text for w in ["not here", "not received", "stolen", "theft", "missing", "says delivered", "marked delivered", "can't find", "cannot find", "never arrived"]
+        )
+        if is_missing_intent and order["status"] == "delivered":
+            delivery = order.get("delivered_date") or order.get("actual_delivery") or "recently"
+            return {
+                "text": f"{empathy}I'm sorry to hear your package is missing after being marked as delivered on {delivery} — that's very stressful. "
+                        f"Order {order['order_id']} | Items: {items_str} | Total: ${order['total']}. "
+                        f"Please first check with neighbours or any safe spots near your door. "
+                        f"If it hasn't turned up within 24 hours, let me know and I'll help you file a carrier claim and look into a reshipment.",
+                "data_verified": True, "data_used": data_used, "source": "db_missing_package"
+            }
+
         # Order tracking / status check
         if order["status"] == "delivered":
             delivery = order.get("delivered_date") or order.get("actual_delivery") or "recently"
@@ -543,6 +628,21 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
     if transaction and not order:
         data_used.append(f"transaction:{transaction['transaction_id']}")
         data_verified = True
+
+        # ── Duplicate charge ──
+        is_duplicate_charge = primary == "duplicate_charge" or transaction.get("is_duplicate") or any(
+            w in text for w in ["charged twice", "double charged", "duplicate", "billed twice", "charged again", "two charges", "extra charge"]
+        )
+        if is_duplicate_charge:
+            original = transaction.get("original_transaction", "a previous transaction")
+            return {
+                "text": f"{empathy}I can see that transaction {transaction['transaction_id']} "
+                        f"for ${transaction['amount']} on {transaction.get('payment_method', 'your card')} "
+                        f"appears to be a duplicate of {original}. "
+                        f"I've flagged this for immediate review and will initiate a full refund of ${transaction['amount']} for the duplicate charge. "
+                        f"You should see the reversal within 2-3 business days. We sincerely apologise for this error.",
+                "data_verified": True, "data_used": data_used, "source": "db_duplicate_charge"
+            }
 
         is_refund_intent = primary in ("refund", "billing") or any(
             w in text for w in ["refund", "money back", "reimburse", "return", "back", "charge"]
@@ -604,6 +704,36 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
 
         # Subscription-focused
         if primary == "subscription" and subscription:
+            PLAN_TIERS  = ["free", "basic", "pro", "enterprise"]
+            PLAN_PRICES = {"free": 0, "basic": 9.99, "pro": 29.99, "enterprise": 99.99}
+            current_plan = subscription.get("plan_name", "").lower()
+            current_idx  = PLAN_TIERS.index(current_plan) if current_plan in PLAN_TIERS else -1
+
+            wants_upgrade   = any(w in text for w in ["upgrade", "higher", "better plan", "more features", "move up"])
+            wants_downgrade = any(w in text for w in ["downgrade", "lower", "cheaper", "reduce", "smaller plan", "less expensive", "move down"])
+
+            if wants_upgrade and current_idx >= 0 and current_idx < len(PLAN_TIERS) - 1:
+                upgrade_options = PLAN_TIERS[current_idx + 1:]
+                option_str = " or ".join(f"{p.upper()} (${PLAN_PRICES[p]}/mo)" for p in upgrade_options)
+                return {
+                    "text": f"{empathy}Your current plan is {current_plan.upper()} at ${subscription['plan_price']}/{subscription['billing_cycle']}. "
+                            f"Available upgrades: {option_str}. "
+                            f"Upgrading takes effect immediately and the price difference will be prorated for the remaining billing period. "
+                            f"Which plan would you like to switch to?",
+                    "data_verified": True, "data_used": data_used, "source": "db_subscription_upgrade_options"
+                }
+
+            if wants_downgrade and current_idx > 0:
+                downgrade_options = list(reversed(PLAN_TIERS[:current_idx]))
+                option_str = " or ".join(f"{p.upper()} (${PLAN_PRICES[p]}/mo)" for p in downgrade_options)
+                return {
+                    "text": f"{empathy}Your current plan is {current_plan.upper()} at ${subscription['plan_price']}/{subscription['billing_cycle']}. "
+                            f"Available downgrades: {option_str}. "
+                            f"Downgrading takes effect at the start of your next billing cycle — no interruption to your current service. "
+                            f"Which plan would you prefer?",
+                    "data_verified": True, "data_used": data_used, "source": "db_subscription_downgrade_options"
+                }
+
             auto = "auto-renews" if subscription.get("auto_renew") else "does not auto-renew"
             return {
                 "text": f"{empathy}Subscription for account {customer['customer_id']}: "
@@ -724,17 +854,75 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             "data_verified": False, "data_used": [], "source": "account_help"
         }
 
+    if primary == "damaged_product":
+        return {
+            "text": f"{empathy}I'm incredibly sorry to hear your product arrived damaged — that's not the experience we want for you. "
+                    f"To resolve this as quickly as possible, please provide your order ID (e.g. ORD-100001) "
+                    f"and a brief description or photo of the damage. "
+                    f"Once verified, I can arrange a replacement or full refund — whichever you prefer.",
+            "data_verified": False, "data_used": [], "source": "damaged_product_needs_id"
+        }
+
+    if primary == "wrong_order":
+        return {
+            "text": f"{empathy}I'm so sorry for the mix-up — receiving the wrong item is definitely not acceptable. "
+                    f"Please provide your order ID (e.g. ORD-100001) and a quick description of what you received versus what you ordered. "
+                    f"I'll generate a prepaid return label for the incorrect item and prioritise shipping your correct order immediately.",
+            "data_verified": False, "data_used": [], "source": "wrong_order_needs_id"
+        }
+
+    if primary == "payment_failure":
+        return {
+            "text": f"{empathy}I'm sorry your payment didn't go through — that can be frustrating when you're trying to check out. "
+                    f"A few common fixes: double-check your billing address and CVV match your card exactly, "
+                    f"and ensure your bank hasn't placed a temporary hold. "
+                    f"You could also try an alternative payment method such as PayPal or Apple Pay. "
+                    f"If you see a specific error code, please share it here and I'll investigate further.",
+            "data_verified": False, "data_used": [], "source": "payment_failure_tips"
+        }
+
+    if primary == "missing_package":
+        return {
+            "text": f"{empathy}I'm sorry to hear your package hasn't arrived — that's very stressful. "
+                    f"First, please check with neighbours or any safe spots near your door. "
+                    f"If it still hasn't turned up within 24 hours, provide your order ID (e.g. ORD-100001) "
+                    f"and I'll help you file a carrier claim and arrange a reshipment.",
+            "data_verified": False, "data_used": [], "source": "missing_package_needs_id"
+        }
+
+    if primary == "product_inquiry":
+        return {
+            "text": f"{empathy}I'd be happy to look up the product details for you! "
+                    f"Could you provide the product name or SKU? "
+                    f"I can then check compatibility, specifications, materials, and current stock availability.",
+            "data_verified": False, "data_used": [], "source": "product_inquiry_needs_sku"
+        }
+
+    if primary == "address_change":
+        return {
+            "text": f"{empathy}I understand — it's easy to enter the wrong address at checkout. "
+                    f"Please provide your order ID (e.g. ORD-100001) and your correct shipping address as soon as possible. "
+                    f"If the order hasn't been dispatched yet, I can update it immediately.",
+            "data_verified": False, "data_used": [], "source": "address_change_needs_id"
+        }
+
     # ── Multi-intent fallback: two intents tied, address both ──
     secondary = intent.get("secondary_intent")
     if secondary and secondary != primary:
         _INTENT_PROMPTS = {
-            "order_status": "order tracking (share an order ID, e.g. ORD-100001)",
-            "shipping":     "shipping & delivery (share an order ID, e.g. ORD-100001)",
-            "refund":       "refunds (share an order or transaction ID)",
-            "billing":      "billing & payments (share an order or transaction ID)",
-            "subscription": "subscriptions (share your customer ID, e.g. CUST-001001)",
-            "account":      "account management (share your customer ID, e.g. CUST-001001)",
-            "technical":    "technical issues (describe what's happening and any error messages)",
+            "order_status":    "order tracking (share an order ID, e.g. ORD-100001)",
+            "shipping":        "shipping & delivery (share an order ID, e.g. ORD-100001)",
+            "refund":          "refunds (share an order or transaction ID)",
+            "billing":         "billing & payments (share an order or transaction ID)",
+            "subscription":    "subscriptions (share your customer ID, e.g. CUST-001001)",
+            "account":         "account management (share your customer ID, e.g. CUST-001001)",
+            "technical":       "technical issues (describe what's happening and any error messages)",
+            "damaged_product": "a damaged item (share your order ID and describe the damage)",
+            "wrong_order":     "a wrong item received (share your order ID and what you got vs. what you ordered)",
+            "payment_failure": "a payment issue (share any error code you're seeing)",
+            "missing_package": "a missing package (share your order ID after checking nearby)",
+            "product_inquiry": "product details (share the product name or SKU)",
+            "address_change":  "a shipping address correction (share your order ID and correct address)",
         }
         p_hint = _INTENT_PROMPTS.get(primary, primary)
         s_hint = _INTENT_PROMPTS.get(secondary, secondary)
@@ -744,12 +932,22 @@ def build_genuine_response(intent: dict, sentiment: dict, proc: dict, db_ctx: di
             "data_verified": False, "data_used": [], "source": "multi_intent_fallback"
         }
 
-    # ── Generic fallback ──
+    # ── Generic fallback — structured clarifying questions ──
+    if sentiment["label"] == "negative" or sentiment.get("intensity", 0) > 0.2:
+        return {
+            "text": f"{empathy}I'm sorry you're having trouble — I want to make sure I direct you correctly. "
+                    f"Could you tell me which area your issue relates to? "
+                    f"(1) An order or delivery, (2) a charge or refund, "
+                    f"(3) your account or subscription, or (4) a technical problem. "
+                    f"Alternatively, sharing an order ID (e.g. ORD-100001) or customer ID (e.g. CUST-001001) "
+                    f"lets me pull up your details straight away.",
+            "data_verified": False, "data_used": [], "source": "vague_complaint_clarify"
+        }
     return {
-        "text": f"{empathy}I'm not fully sure I understand your request. I can help with: "
-                f"order tracking, refunds, billing, subscriptions, account management, and technical issues. "
-                f"If you share an order ID (ORD-XXXXXX), customer ID (CUST-XXXXXX), or describe your issue in more detail, "
-                f"I'll do my best to assist!",
+        "text": f"{empathy}I'm here to help! I can assist with order tracking, refunds, billing, "
+                f"subscriptions, and account issues. "
+                f"Share an order ID (e.g. ORD-100001), customer ID (e.g. CUST-001001), "
+                f"or describe your issue and I'll get right on it.",
         "data_verified": False, "data_used": [], "source": "fallback"
     }
 
@@ -897,12 +1095,21 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     if tc <= 3 and not is_conv_override:
         missing.append("More details about your specific situation")
     if not db_ctx["found"] and not db_ctx["errors"]:
-        if primary in ("order_status","shipping","refund","billing"):
+        if primary in ("order_status", "shipping", "refund", "billing",
+                       "damaged_product", "wrong_order", "missing_package", "address_change"):
             missing.append("Your order ID (e.g. ORD-100001) or transaction ID (e.g. TXN-200001)")
-        if primary in ("account","subscription"):
+        if primary in ("account", "subscription"):
             missing.append("Your customer ID (e.g. CUST-001001)")
+        if primary == "product_inquiry":
+            missing.append("The product name or SKU you're asking about")
     if primary == "technical":
         missing.append("Specific error messages or steps to reproduce the issue")
+    if primary == "damaged_product" and not db_ctx["found"]:
+        missing.append("A photo or description of the damage")
+    if primary == "wrong_order" and not db_ctx["found"]:
+        missing.append("Description of the item received vs. what was ordered")
+    if primary == "payment_failure":
+        missing.append("Any error code shown at checkout")
 
     return {
         "score": total, "level": level, "description": desc,
@@ -915,7 +1122,7 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 # HUMAN HANDOFF
 # ═══════════════════════════════════════════════════════════════
 
-_CONVERSATIONAL_INTENTS = {"greeting", "thanks", "farewell"}
+_CONVERSATIONAL_INTENTS = {"greeting", "thanks", "farewell", "product_inquiry"}
 
 def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None) -> dict:
     reasons = []
@@ -994,6 +1201,27 @@ def chat():
     ids       = extract_ids(msg, context)
     db_ctx    = gather_db_context(ids, intent["primary_intent"])
     response  = build_genuine_response(intent, sentiment, proc, db_ctx, ids, context)
+
+    # ── LLM response enhancement ──
+    # Template response is always generated first (reliable fallback).
+    # If NVIDIA NIM is available, replace the text with a more natural reply
+    # while keeping all metadata (data_verified, data_used, source) intact.
+    _SKIP_LLM_SOURCES = {"greeting", "farewell", "thanks"}
+    if LLM_AVAILABLE and response["source"] not in _SKIP_LLM_SOURCES:
+        try:
+            llm_text = llm_service.generate_response(
+                user_message=msg,
+                intent=intent,
+                sentiment=sentiment,
+                db_ctx=db_ctx,
+                template_text=response["text"],
+                context=context,
+            )
+            response["text"] = llm_text
+            response["source"] = response["source"] + "_llm"
+        except Exception as _llm_ex:
+            logger.warning(f"[{session_id}] LLM generation failed, using template: {_llm_ex}")
+
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
     handoff   = evaluate_handoff(confidence, sentiment, intent)
 

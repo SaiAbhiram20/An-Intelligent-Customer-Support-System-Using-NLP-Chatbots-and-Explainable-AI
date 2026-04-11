@@ -29,7 +29,14 @@
       "Bash(npm run:*)",
       "Bash(pip install:*)",
       "Bash(\"C:/Users/user/Downloads/ASE/venv/Scripts/pip.exe\" install:*)",
-      "Bash(venv/Scripts/python.exe -m pytest test_app.py -v)"
+      "Bash(venv/Scripts/python.exe -m pytest test_app.py -v)",
+      "WebSearch",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python export_csv.py)",
+      "Bash(npm search:*)",
+      "Bash(bash scripts/install.sh --tool antigravity)",
+      "Bash(bash scripts/convert.sh --tool antigravity)"
     ]
   }
 }
