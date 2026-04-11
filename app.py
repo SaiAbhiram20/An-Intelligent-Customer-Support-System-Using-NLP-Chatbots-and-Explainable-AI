@@ -1324,6 +1324,25 @@ def login():
     return jsonify({"error": "Invalid credentials"}), 401
 
 
+@app.route('/api/user-login', methods=['POST'])
+def user_login():
+    data = request.get_json(silent=True, force=True)
+    if not data:
+        return jsonify({"error": "No credentials provided"}), 400
+    username = data.get("username", "")
+    password = data.get("password", "")
+    if (username == os.environ.get("USER_USERNAME") and
+            password == os.environ.get("USER_PASSWORD")):
+        token = jwt.encode(
+            {"sub": username, "role": "user",
+             "exp": datetime.utcnow() + timedelta(hours=8)},
+            os.environ["JWT_SECRET_KEY"],
+            algorithm="HS256"
+        )
+        return jsonify({"token": token})
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
 @app.route('/api/analytics', methods=['GET'])
 @token_required
 def analytics():
