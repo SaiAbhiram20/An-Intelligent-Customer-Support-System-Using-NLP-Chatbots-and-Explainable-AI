@@ -266,26 +266,26 @@ class TestAPI:
 
 
 class TestUserAuth:
-    def test_user_login_valid(self, client):
-        import os
-        os.environ["USER_USERNAME"] = "testuser"
-        os.environ["USER_PASSWORD"] = "testpass"
-        os.environ.setdefault("JWT_SECRET_KEY", "testsecret")
+    def test_user_login_valid(self, client, monkeypatch):
+        monkeypatch.setenv("USER_USERNAME", "testuser")
+        monkeypatch.setenv("USER_PASSWORD", "testpass")
+        monkeypatch.setenv("JWT_SECRET_KEY", "testsecret")
         res = client.post("/api/user-login",
                           json={"username": "testuser", "password": "testpass"})
         assert res.status_code == 200
         assert "token" in res.get_json()
 
-    def test_user_login_invalid(self, client):
-        import os
-        os.environ["USER_USERNAME"] = "testuser"
-        os.environ["USER_PASSWORD"] = "testpass"
+    def test_user_login_invalid(self, client, monkeypatch):
+        monkeypatch.setenv("USER_USERNAME", "testuser")
+        monkeypatch.setenv("USER_PASSWORD", "testpass")
+        monkeypatch.setenv("JWT_SECRET_KEY", "testsecret")
         res = client.post("/api/user-login",
                           json={"username": "testuser", "password": "wrong"})
         assert res.status_code == 401
         assert res.get_json()["error"] == "Invalid credentials"
 
-    def test_user_login_no_body(self, client):
+    def test_user_login_no_body(self, client, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", "testsecret")
         res = client.post("/api/user-login", data="notjson",
                           content_type="text/plain")
         assert res.status_code == 400

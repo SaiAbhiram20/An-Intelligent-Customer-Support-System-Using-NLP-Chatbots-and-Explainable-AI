@@ -12,6 +12,7 @@ import os
 import re
 import json
 import uuid
+import hmac
 import logging
 import jwt
 from functools import wraps
@@ -1327,12 +1328,12 @@ def login():
 @app.route('/api/user-login', methods=['POST'])
 def user_login():
     data = request.get_json(silent=True, force=True)
-    if not data:
+    if not data or not isinstance(data, dict):
         return jsonify({"error": "No credentials provided"}), 400
     username = data.get("username", "")
     password = data.get("password", "")
-    if (username == os.environ.get("USER_USERNAME") and
-            password == os.environ.get("USER_PASSWORD")):
+    if (hmac.compare_digest(username, os.environ.get("USER_USERNAME", "")) and
+            hmac.compare_digest(password, os.environ.get("USER_PASSWORD", ""))):
         token = jwt.encode(
             {"sub": username, "role": "user",
              "exp": datetime.utcnow() + timedelta(hours=8)},
