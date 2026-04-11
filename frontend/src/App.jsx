@@ -1013,29 +1013,57 @@ export default function App() {
   const [explainStates, setExplainStates] = useState({});
   const [useMock, setUseMock] = useState(true);
   const [view, setView] = useState("chat"); // "chat" | "dashboard"
-  const [token, setToken] = useState(() => localStorage.getItem("admin_token") || null);
-  const isAuthenticated = !!token;
+  const [chatToken, setChatToken]   = useState(() => localStorage.getItem("chat_token") || null);
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem("admin_token") || null);
+  // eslint-disable-next-line no-unused-vars
+  const [showDashboardLogin, setShowDashboardLogin] = useState(false);
   const [sessionId] = useState(() => crypto.randomUUID());
   const bottomRef = useRef(null);
   const loadingTimerRef = useRef(null);
 
-  function handleLoginSuccess(newToken) {
+  function handleChatLogin(newToken) {
+    localStorage.setItem("chat_token", newToken);
+    setChatToken(newToken);
+  }
+  function handleAdminLogin(newToken) {
     localStorage.setItem("admin_token", newToken);
-    setToken(newToken);
+    setAdminToken(newToken);
+    setShowDashboardLogin(false);
+    setView("dashboard");
+  }
+  function handleChatLogout() {
+    localStorage.removeItem("chat_token");
+    localStorage.removeItem("admin_token");
+    setChatToken(null);
+    setAdminToken(null);
+    setView("chat");
+    setShowDashboardLogin(false);
+  }
+  function handleDashboardLogout() {
+    localStorage.removeItem("admin_token");
+    setAdminToken(null);
     setView("chat");
   }
-  function handleLogout() {
+  function handleDashboardAuthError() {
     localStorage.removeItem("admin_token");
-    setToken(null);
+    setAdminToken(null);
+    setShowDashboardLogin(true);
   }
-  function handleAuthError() {
-    localStorage.removeItem("admin_token");
-    setToken(null);
+  function handleDashboardClick() {
+    if (!adminToken) { setShowDashboardLogin(true); return; }
+    setView("dashboard");
   }
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  if (!isAuthenticated) return <LoginPage onSuccess={handleLoginSuccess} />;
+  if (!chatToken) return (
+    <LoginPage
+      useMock={useMock}
+      onToggleMock={() => setUseMock(m => !m)}
+      onChatSuccess={handleChatLogin}
+      onAdminSuccess={handleAdminLogin}
+    />
+  );
 
   const send = async () => {
     if (!input.trim() || loading) return;
@@ -1112,7 +1140,7 @@ export default function App() {
                 borderRight: "1px solid var(--border)" }}>
               Chat
             </button>
-            <button onClick={() => setView("dashboard")}
+            <button onClick={handleDashboardClick}
               style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
                 background: view === "dashboard" ? "rgba(6,214,255,0.15)" : "transparent",
                 color: view === "dashboard" ? "var(--accent-cyan)" : "var(--text-muted)" }}>
@@ -1123,8 +1151,16 @@ export default function App() {
             <input type="checkbox" checked={!useMock} onChange={e => setUseMock(!e.target.checked)} style={{ accentColor: "var(--accent-cyan)" }} />
             Live API
           </label>
-          {isAuthenticated && (
-            <button onClick={handleLogout}
+          {view === "dashboard" ? (
+            <button onClick={handleDashboardLogout}
+              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 7,
+                border: "1px solid var(--border)", background: "transparent",
+                color: "var(--text-secondary)", cursor: "pointer",
+                transition: "border-color 0.2s, color 0.2s" }}>
+              Exit Dashboard
+            </button>
+          ) : (
+            <button onClick={handleChatLogout}
               style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 7,
                 border: "1px solid var(--border)", background: "transparent",
                 color: "var(--text-secondary)", cursor: "pointer",
@@ -1191,7 +1227,7 @@ export default function App() {
           </div>
         </>
       ) : (
-        <AnalyticsDashboard useMock={useMock} token={token} onAuthError={handleAuthError} />
+        <AnalyticsDashboard useMock={useMock} token={adminToken} onAuthError={handleDashboardAuthError} />
       )}
 
     </div>
