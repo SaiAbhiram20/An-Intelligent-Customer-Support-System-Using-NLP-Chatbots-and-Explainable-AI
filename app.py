@@ -106,11 +106,13 @@ def token_required(f):
             return jsonify({"error": "Missing or invalid token"}), 401
         token = auth_header.split(" ", 1)[1]
         try:
-            jwt.decode(token, os.environ["JWT_SECRET_KEY"], algorithms=["HS256"])
+            payload = jwt.decode(token, os.environ["JWT_SECRET_KEY"], algorithms=["HS256"])
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401
         except jwt.InvalidTokenError:
             return jsonify({"error": "Invalid token"}), 401
+        if payload.get("role") == "user":
+            return jsonify({"error": "Forbidden"}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -1314,8 +1316,12 @@ def login():
         return jsonify({"error": "No credentials provided"}), 400
     username = data.get("username", "")
     password = data.get("password", "")
-    if (username == os.environ.get("ADMIN_USERNAME") and
-            password == os.environ.get("ADMIN_PASSWORD")):
+    expected_admin = os.environ.get("ADMIN_USERNAME")
+    expected_pass = os.environ.get("ADMIN_PASSWORD")
+    if not expected_admin or not expected_pass:
+        return jsonify({"error": "Service misconfigured"}), 503
+    if (hmac.compare_digest(username, expected_admin) and
+            hmac.compare_digest(password, expected_pass)):
         token = jwt.encode(
             {"sub": username, "exp": datetime.utcnow() + timedelta(hours=8)},
             os.environ["JWT_SECRET_KEY"],

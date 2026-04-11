@@ -1219,7 +1219,7 @@ export default function App() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  if (!chatToken) return (
+  if (!chatToken && !adminToken) return (
     <LoginPage
       useMock={useMock}
       onToggleMock={() => setUseMock(m => !m)}
