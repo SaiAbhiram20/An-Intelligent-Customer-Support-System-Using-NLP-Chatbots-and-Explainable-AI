@@ -1332,8 +1332,12 @@ def user_login():
         return jsonify({"error": "No credentials provided"}), 400
     username = data.get("username", "")
     password = data.get("password", "")
-    if (hmac.compare_digest(username, os.environ.get("USER_USERNAME", "")) and
-            hmac.compare_digest(password, os.environ.get("USER_PASSWORD", ""))):
+    expected_user = os.environ.get("USER_USERNAME")
+    expected_pass = os.environ.get("USER_PASSWORD")
+    if not expected_user or not expected_pass:
+        return jsonify({"error": "Service misconfigured"}), 503
+    if (hmac.compare_digest(username, expected_user) and
+            hmac.compare_digest(password, expected_pass)):
         token = jwt.encode(
             {"sub": username, "role": "user",
              "exp": datetime.utcnow() + timedelta(hours=8)},
