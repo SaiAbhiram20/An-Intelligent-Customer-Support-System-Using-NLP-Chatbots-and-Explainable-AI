@@ -646,11 +646,12 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
           }}>
             <strong style={{ color: "#f87171" }}>Human handoff recommended</strong>
             <div style={{ marginTop: 3, color: "#9a6a6a" }}>{msg.apiData.handoff.reasons.join("; ")}</div>
-            <button style={{
+            <a href="tel:3612713642" style={{
               display: "inline-block", marginTop: 8, padding: "6px 14px",
-              background: "linear-gradient(135deg, #dc2626, #b91c1c)", border: "none",
-              borderRadius: 7, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600
-            }}>Connect with Agent</button>
+              background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+              borderRadius: 7, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600,
+              textDecoration: "none"
+            }}>📞 Connect with Agent · (361) 271-3642</a>
           </div>
         )}
 
