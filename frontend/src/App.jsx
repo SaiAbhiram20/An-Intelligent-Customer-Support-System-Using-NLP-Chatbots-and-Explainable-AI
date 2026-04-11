@@ -322,7 +322,7 @@ function mockAPI(message, chatHistory = []) {
       sentiment: { label: sentLabel, score: sentScore, intensity: Math.round(intensity * 100) / 100, positive_signals: posM, negative_signals: negM, explanations: [...posM.map(w => `Positive: '${w}'`), ...negM.map(w => `Negative: '${w}'`)] },
       database: { ids_extracted: ids, lookups_performed: dbLookups, data_found: dbFound, errors: dbErrors }
     },
-    handoff: { recommended: totalConf < 35 || intensity > 0.6, reasons: totalConf < 35 ? ["Low confidence"] : intensity > 0.6 ? ["High frustration"] : [], message: totalConf < 35 || intensity > 0.6 ? "Connecting you with a human agent." : null }
+    handoff: { recommended: totalConf < 35 || intensity > 0.4, reasons: totalConf < 35 ? ["Low confidence"] : intensity > 0.4 ? ["High frustration"] : [], message: totalConf < 35 || intensity > 0.4 ? "Connecting you with a human agent." : null }
   };
 }
 

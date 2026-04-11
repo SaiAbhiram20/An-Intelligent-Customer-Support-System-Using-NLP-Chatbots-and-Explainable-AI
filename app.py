@@ -1117,7 +1117,7 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
     return {
         "score": total, "level": level, "description": desc,
         "factors": factors, "missing_information": missing,
-        "human_handoff_recommended": total < 35 or (sentiment["label"] == "negative" and sentiment["intensity"] > 0.6)
+        "human_handoff_recommended": total < 35 or (sentiment["label"] == "negative" and sentiment["intensity"] > 0.4)
     }
 
 
@@ -1127,15 +1127,42 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
 _CONVERSATIONAL_INTENTS = {"greeting", "thanks", "farewell", "product_inquiry"}
 
-def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None) -> dict:
+# In-memory tracker: session_id → deque of last 3 sentiment labels
+from collections import deque
+_session_sentiments: dict = {}
+
+def _record_sentiment(session_id: str, label: str) -> int:
+    """Append label to session history; return count of consecutive trailing negatives."""
+    if session_id not in _session_sentiments:
+        _session_sentiments[session_id] = deque(maxlen=3)
+    _session_sentiments[session_id].append(label)
+    history = list(_session_sentiments[session_id])
+    # Count how many trailing messages are negative
+    count = 0
+    for lbl in reversed(history):
+        if lbl == "negative":
+            count += 1
+        else:
+            break
+    return count
+
+def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None, session_id: str = None) -> dict:
     reasons = []
     primary = (intent or {}).get("primary_intent", "unknown")
     # Only escalate on low confidence for non-conversational intents — a greeting
     # scoring < 35 is a classification edge case, not a genuine support failure.
     if confidence["score"] < 35 and primary not in _CONVERSATIONAL_INTENTS:
         reasons.append("Low confidence in understanding your request")
-    if sentiment["label"] == "negative" and sentiment["intensity"] > 0.6:
+    # Threshold lowered to 0.4: a single intensified negative word now triggers
+    if sentiment["label"] == "negative" and sentiment["intensity"] > 0.4:
         reasons.append("Detected high frustration — a human agent can provide better support")
+    # Consecutive-negative check: 2+ negative messages in a row escalates regardless of intensity
+    if session_id and not reasons:
+        consecutive = _record_sentiment(session_id, sentiment["label"])
+        if consecutive >= 2:
+            reasons.append("Persistent frustration across multiple messages — connecting you with a human agent")
+    elif session_id:
+        _record_sentiment(session_id, sentiment["label"])
     return {
         "recommended": len(reasons) > 0,
         "reasons": reasons,
@@ -1226,7 +1253,7 @@ def chat():
             logger.warning(f"[{session_id}] LLM generation failed, using template: {_llm_ex}")
 
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
-    handoff   = evaluate_handoff(confidence, sentiment, intent)
+    handoff   = evaluate_handoff(confidence, sentiment, intent, session_id)
 
     result = {
         "session_id": session_id,
