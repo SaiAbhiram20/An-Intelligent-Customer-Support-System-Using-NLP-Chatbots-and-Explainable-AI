@@ -728,6 +728,7 @@ function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
       });
       const data = await res.json();
       if (res.ok) {
+        if (!data.token) { setError("Login error: no token returned"); setLoading(false); return; }
         onSuccess(data.token);
       } else {
         setError(data.error || "Invalid credentials");
