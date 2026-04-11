@@ -699,18 +699,43 @@ const IntentBar = ({ intent, count, max }) => {
 /* ═══════════════════════════════════════════════════════════════
    LOGIN PAGE
    ═══════════════════════════════════════════════════════════════ */
-function LoginPage({ onSuccess }) {
+function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
+  const [activeTab, setActiveTab] = useState("user"); // "user" | "admin"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  function switchTab(tab) {
+    setActiveTab(tab);
+    setError("");
+    setUsername("");
+    setPassword("");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    if (useMock) {
+      if (!username.trim() || !password.trim()) {
+        setError("Please enter a username and password");
+        setLoading(false);
+        return;
+      }
+      await new Promise(r => setTimeout(r, 300));
+      if (activeTab === "user") {
+        onChatSuccess("mock-chat-token");
+      } else {
+        onAdminSuccess("mock-admin-token");
+      }
+      setLoading(false);
+      return;
+    }
+    const endpoint = activeTab === "user" ? "/api/user-login" : "/api/login";
+    const onSuccess = activeTab === "user" ? onChatSuccess : onAdminSuccess;
     try {
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
@@ -765,12 +790,31 @@ function LoginPage({ onSuccess }) {
           <div style={{ fontSize: 13, color: "#4a6a8a", marginTop: 6, letterSpacing: 0.1 }}>Sign in to access the platform</div>
         </div>
 
+        {/* Tab Switcher */}
+        <div style={{ display: "flex", background: "rgba(12,20,34,0.72)", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(6,214,255,0.16)", marginBottom: 16 }}>
+          <button type="button" onClick={() => switchTab("user")}
+            style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+              background: activeTab === "user" ? "rgba(6,214,255,0.15)" : "transparent",
+              color: activeTab === "user" ? "#06d6ff" : "#4a6a8a",
+              transition: "background 0.2s, color 0.2s" }}>
+            User Access
+          </button>
+          <button type="button" onClick={() => switchTab("admin")}
+            style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+              borderLeft: "1px solid rgba(6,214,255,0.16)",
+              background: activeTab === "admin" ? "rgba(139,92,246,0.15)" : "transparent",
+              color: activeTab === "admin" ? "#a78bfa" : "#4a6a8a",
+              transition: "background 0.2s, color 0.2s" }}>
+            Admin Access
+          </button>
+        </div>
+
         {/* Glass Card */}
         <div style={{
           background: "rgba(12, 20, 34, 0.72)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid rgba(6,214,255,0.16)",
+          border: activeTab === "user" ? "1px solid rgba(6,214,255,0.16)" : "1px solid rgba(139,92,246,0.20)",
           borderRadius: 20,
           padding: "32px 32px 28px",
           boxShadow: "0 8px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset"
@@ -780,7 +824,7 @@ function LoginPage({ onSuccess }) {
               <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
               <input
                 value={username} onChange={e => setUsername(e.target.value)}
-                autoFocus required placeholder="Enter your username"
+                autoFocus required placeholder={activeTab === "user" ? "Enter your username" : "Enter admin username"}
                 className="login-input"
               />
             </div>
@@ -800,13 +844,22 @@ function LoginPage({ onSuccess }) {
                 {error}
               </div>
             )}
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? "Signing in…" : "Sign In →"}
+            <button type="submit" disabled={loading} className="btn-primary"
+              style={{ background: activeTab === "admin" ? "linear-gradient(135deg, #7c3aed, #4f46e5)" : undefined }}>
+              {loading ? "Signing in…" : activeTab === "user" ? "Sign In →" : "Admin Sign In →"}
             </button>
           </form>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 22, fontSize: 11, color: "#1e3048", letterSpacing: 0.5 }}>
+        {/* Mock mode toggle */}
+        <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: "#1e3048" }}>
+          <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <input type="checkbox" checked={!useMock} onChange={onToggleMock} style={{ accentColor: "#06d6ff" }} />
+            <span>Live API {useMock ? "(Mock mode on)" : "(Live mode)"}</span>
+          </label>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#1e3048", letterSpacing: 0.5 }}>
           NLP &bull; Database Verified &bull; Confidence Scoring &bull; XAI
         </div>
       </div>
