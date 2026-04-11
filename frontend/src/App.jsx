@@ -1393,6 +1393,14 @@ export default function App() {
         <AnalyticsDashboard useMock={useMock} token={adminToken} onAuthError={handleDashboardAuthError} />
       )}
 
+      {showDashboardLogin && (
+        <DashboardLoginModal
+          useMock={useMock}
+          onSuccess={handleAdminLogin}
+          onCancel={() => setShowDashboardLogin(false)}
+        />
+      )}
+
     </div>
   );
 }
