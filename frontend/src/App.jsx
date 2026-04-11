@@ -842,7 +842,7 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
       setLoading(false);
       return;
     }
-    const endpoint = activeTab === "user" ? "/api/user-login" : "/api/login";
+    const endpoint = activeTab === "user" ? "/user-login" : "/login";
     const onSuccess = activeTab === "user" ? onChatSuccess : onAdminSuccess;
     try {
       const res = await fetch(`${API_URL}${endpoint}`, {
