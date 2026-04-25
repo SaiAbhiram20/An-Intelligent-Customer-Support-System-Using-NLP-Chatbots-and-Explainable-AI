@@ -1127,42 +1127,57 @@ def compute_confidence(intent: dict, sentiment: dict, proc: dict, db_ctx: dict) 
 
 _CONVERSATIONAL_INTENTS = {"greeting", "thanks", "farewell", "product_inquiry"}
 
-# In-memory tracker: session_id → deque of last 3 sentiment labels
+# session_id -> {"labels": deque[str], "scores": deque[float], "ema": float}
 from collections import deque
 _session_sentiments: dict = {}
+_EMA_ALPHA = 0.4
 
-def _record_sentiment(session_id: str, label: str) -> int:
-    """Append label to session history; return count of consecutive trailing negatives."""
-    if session_id not in _session_sentiments:
-        _session_sentiments[session_id] = deque(maxlen=3)
-    _session_sentiments[session_id].append(label)
-    history = list(_session_sentiments[session_id])
-    # Count how many trailing messages are negative
-    count = 0
-    for lbl in reversed(history):
+def _record_sentiment(session_id: str, label: str, score: float) -> dict:
+    """Append label/score to session history, update EMA, return trajectory snapshot."""
+    state = _session_sentiments.setdefault(session_id, {
+        "labels": deque(maxlen=10),
+        "scores": deque(maxlen=10),
+        "ema": 0.0,
+    })
+    prev_ema = state["ema"] if state["scores"] else score
+    state["labels"].append(label)
+    state["scores"].append(score)
+    state["ema"] = _EMA_ALPHA * score + (1 - _EMA_ALPHA) * prev_ema
+
+    consecutive = 0
+    for lbl in reversed(state["labels"]):
         if lbl == "negative":
-            count += 1
+            consecutive += 1
         else:
             break
-    return count
 
-def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None, session_id: str = None) -> dict:
+    delta = score - prev_ema
+    if delta > 0.1:
+        trend = "improving"
+    elif delta < -0.1:
+        trend = "worsening"
+    else:
+        trend = "steady"
+
+    return {
+        "consecutive_negative": consecutive,
+        "rolling_score": round(state["ema"], 3),
+        "previous_score": round(prev_ema, 3),
+        "delta": round(delta, 3),
+        "history": [round(s, 3) for s in state["scores"]],
+        "trend": trend,
+    }
+
+def evaluate_handoff(confidence: dict, sentiment: dict, intent: dict = None, session_id: str = None,
+                     trajectory: dict = None) -> dict:
     reasons = []
     primary = (intent or {}).get("primary_intent", "unknown")
-    # Only escalate on low confidence for non-conversational intents — a greeting
-    # scoring < 35 is a classification edge case, not a genuine support failure.
     if confidence["score"] < 35 and primary not in _CONVERSATIONAL_INTENTS:
         reasons.append("Low confidence in understanding your request")
-    # Threshold lowered to 0.4: a single intensified negative word now triggers
     if sentiment["label"] == "negative" and sentiment["intensity"] > 0.4:
         reasons.append("Detected high frustration — a human agent can provide better support")
-    # Consecutive-negative check: 2+ negative messages in a row escalates regardless of intensity
-    if session_id and not reasons:
-        consecutive = _record_sentiment(session_id, sentiment["label"])
-        if consecutive >= 2:
-            reasons.append("Persistent frustration across multiple messages — connecting you with a human agent")
-    elif session_id:
-        _record_sentiment(session_id, sentiment["label"])
+    if trajectory and trajectory.get("consecutive_negative", 0) >= 2 and not reasons:
+        reasons.append("Persistent frustration across multiple messages — connecting you with a human agent")
     return {
         "recommended": len(reasons) > 0,
         "reasons": reasons,
@@ -1253,7 +1268,8 @@ def chat():
             logger.warning(f"[{session_id}] LLM generation failed, using template: {_llm_ex}")
 
     confidence = compute_confidence(intent, sentiment, proc, db_ctx)
-    handoff   = evaluate_handoff(confidence, sentiment, intent, session_id)
+    trajectory = _record_sentiment(session_id, sentiment["label"], float(sentiment.get("score", 0.0)))
+    handoff   = evaluate_handoff(confidence, sentiment, intent, session_id, trajectory)
 
     result = {
         "session_id": session_id,
@@ -1283,6 +1299,11 @@ def chat():
                 "label": sentiment["label"],
                 "score": sentiment["score"],
                 "intensity": sentiment["intensity"],
+                "rolling_score": trajectory["rolling_score"],
+                "previous_score": trajectory["previous_score"],
+                "delta": trajectory["delta"],
+                "history": trajectory["history"],
+                "trend": trajectory["trend"],
                 "positive_signals": sentiment["positive_matches"],
                 "negative_signals": sentiment["negative_matches"],
                 "explanations": sentiment["explanations"]

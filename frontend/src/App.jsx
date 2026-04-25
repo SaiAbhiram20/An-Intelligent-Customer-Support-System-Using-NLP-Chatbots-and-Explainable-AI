@@ -331,7 +331,7 @@ function mockAPI(message, chatHistory = []) {
    ═══════════════════════════════════════════════════════════════ */
 
 const ConfidenceMeter = ({ score, level }) => {
-  const color = score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : score >= 30 ? "#f97316" : "#ef4444";
+  const color = score >= 75 ? "#3d6b3a" : score >= 50 ? "#f59e0b" : score >= 30 ? "#f97316" : "#ef4444";
   const glow  = score >= 75 ? "rgba(16,185,129,0.25)" : score >= 50 ? "rgba(245,158,11,0.25)" : score >= 30 ? "rgba(249,115,22,0.25)" : "rgba(239,68,68,0.25)";
   const circumference = 2 * Math.PI * 22; // r=22
   return (
@@ -339,7 +339,7 @@ const ConfidenceMeter = ({ score, level }) => {
       <div style={{ position: "relative", width: 56, height: 56 }}>
         <svg width="56" height="56" viewBox="0 0 56 56">
           {/* Track */}
-          <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+          <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(26,22,18,0.07)" strokeWidth="4" />
           {/* Glow halo */}
           <circle cx="28" cy="28" r="22" fill="none" stroke={color} strokeWidth="6"
             strokeDasharray={`${(score / 100) * circumference} ${circumference}`}
@@ -363,7 +363,7 @@ const ConfidenceMeter = ({ score, level }) => {
       </div>
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1.2 }}>{level}</div>
-        <div style={{ fontSize: 11, color: "#364d66", marginTop: 1 }}>confidence</div>
+        <div style={{ fontSize: 11, color: "#8a7a66", marginTop: 1 }}>confidence</div>
       </div>
     </div>
   );
@@ -372,25 +372,25 @@ const ConfidenceMeter = ({ score, level }) => {
 const FactorBar = ({ factor }) => {
   const pct = Math.min(factor.raw_score, 100);
   const gradient = pct >= 70
-    ? "linear-gradient(90deg, #059669, #10b981)"
+    ? "linear-gradient(90deg, #3d6b3a, #3d6b3a)"
     : pct >= 40
     ? "linear-gradient(90deg, #d97706, #f59e0b)"
     : "linear-gradient(90deg, #dc2626, #f87171)";
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
-        <span style={{ color: "#a8c0de", fontWeight: 500 }}>
-          {factor.name} <span style={{ color: "#364d66" }}>({factor.weight})</span>
+        <span style={{ color: "#4a4036", fontWeight: 500 }}>
+          {factor.name} <span style={{ color: "#8a7a66" }}>({factor.weight})</span>
         </span>
-        <span style={{ color: "#7a9dc4", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{factor.raw_score}%</span>
+        <span style={{ color: "#4a4036", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{factor.raw_score}%</span>
       </div>
-      <div style={{ height: 5, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 5, background: "rgba(26,22,18,0.07)", borderRadius: 3, overflow: "hidden" }}>
         <div style={{
           height: "100%", width: `${pct}%`, background: gradient,
           borderRadius: 3, transition: "width 0.7s cubic-bezier(.4,0,.2,1)"
         }} />
       </div>
-      <div style={{ fontSize: 11, color: "#364d66", marginTop: 3, lineHeight: 1.4 }}>{factor.explanation}</div>
+      <div style={{ fontSize: 11, color: "#8a7a66", marginTop: 3, lineHeight: 1.4 }}>{factor.explanation}</div>
     </div>
   );
 };
@@ -402,9 +402,9 @@ const DataBadge = ({ meta }) => {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px",
       borderRadius: 20, fontSize: 11, fontWeight: 600,
-      background: v ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.04)",
-      border: `1px solid ${v ? "rgba(16,185,129,0.30)" : "rgba(255,255,255,0.07)"}`,
-      color: v ? "#4ade80" : "#4a6a8a"
+      background: v ? "rgba(16,185,129,0.10)" : "rgba(26,22,18,0.06)",
+      border: `1px solid ${v ? "rgba(16,185,129,0.30)" : "rgba(26,22,18,0.10)"}`,
+      color: v ? "#5a8a55" : "#6b5d4f"
     }}>
       <span style={{ fontSize: 9 }}>{v ? "●" : "○"}</span>
       {v ? "DB Verified" : "No DB Data"}
@@ -413,13 +413,111 @@ const DataBadge = ({ meta }) => {
   );
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   SENTIMENT TRAJECTORY — rolling EMA + delta + sparkline
+   ═══════════════════════════════════════════════════════════════ */
+const SentimentTrajectory = ({ sent, sentColor }) => {
+  const history = Array.isArray(sent.history) && sent.history.length > 0 ? sent.history : [sent.score ?? 0];
+  const rolling = sent.rolling_score ?? sent.score ?? 0;
+  const previous = sent.previous_score ?? rolling;
+  const delta = sent.delta ?? 0;
+  const trend = sent.trend ?? "steady";
+
+  // Build sparkline path from history (-1..1 → SVG y)
+  const W = 96, H = 22;
+  const n = history.length;
+  const xs = history.map((_, i) => n === 1 ? W / 2 : (i / (n - 1)) * W);
+  const ys = history.map(s => H - ((Math.max(-1, Math.min(1, s)) + 1) / 2) * H);
+  const points = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  const lastX = xs[n - 1], lastY = ys[n - 1];
+
+  const arrow = sent.label === "positive" ? "↑" : sent.label === "negative" ? "↓" : "→";
+  const trendIcon = trend === "improving" ? "▲" : trend === "worsening" ? "▼" : "—";
+  const trendColor = trend === "improving" ? "#3d6b3a" : trend === "worsening" ? "#a23a2a" : "#8a7a66";
+  const deltaText = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
+
+  return (
+    <div
+      key={`${rolling}-${delta}`}
+      style={{
+        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+        padding: "10px 14px",
+        background: "rgba(251,248,242,0.92)",
+        border: `1px solid ${sentColor}33`,
+        borderLeft: `2px solid ${sentColor}`,
+        borderRadius: 10,
+        animation: "inkRise 0.45s cubic-bezier(.4,0,.2,1)"
+      }}
+      title={`Rolling mood: ${rolling.toFixed(2)} (was ${previous.toFixed(2)})`}
+    >
+      <span style={{
+        fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic", fontSize: 18,
+        color: sentColor, lineHeight: 1, fontWeight: 500,
+      }}>
+        {arrow} {sent.label}
+      </span>
+      <svg width={W} height={H} style={{ display: "block" }} aria-hidden="true">
+        <line x1="0" y1={H/2} x2={W} y2={H/2} stroke="#d9cfbf" strokeDasharray="2 3" strokeWidth="0.8" />
+        <polyline points={points} fill="none" stroke="#b8492a" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={lastX} cy={lastY} r="2.6" fill="#1a1612" />
+      </svg>
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "3px 9px", borderRadius: 14, fontSize: 11, fontWeight: 600,
+        background: trend === "improving" ? "rgba(61,107,58,0.10)"
+                  : trend === "worsening" ? "rgba(162,58,42,0.10)"
+                  : "rgba(138,122,102,0.12)",
+        color: trendColor,
+        border: `1px solid ${trendColor}33`,
+      }}>
+        {trendIcon} {deltaText}
+      </span>
+      <span style={{ fontSize: 11, color: "#8a7a66", fontFamily: "'JetBrains Mono', monospace" }}>
+        rolling {rolling.toFixed(2)} · this {(sent.score ?? 0).toFixed(2)}
+      </span>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   SESSION SENTIMENT RIBBON — always-visible mood indicator
+   ═══════════════════════════════════════════════════════════════ */
+const SentimentRibbon = ({ rolling, label }) => {
+  const v = Math.max(-1, Math.min(1, rolling ?? 0));
+  const pos = ((v + 1) / 2) * 100; // 0..100
+  return (
+    <div style={{
+      position: "relative",
+      height: 6,
+      borderRadius: 999,
+      background: "linear-gradient(90deg, #a23a2a 0%, #e8d5c4 50%, #3d6b3a 100%)",
+      opacity: 0.55,
+      overflow: "visible",
+    }}>
+      <div
+        title={`Session mood: ${v.toFixed(2)} · ${label || "neutral"}`}
+        style={{
+          position: "absolute",
+          left: `calc(${pos}% - 7px)`,
+          top: -4,
+          width: 14, height: 14,
+          borderRadius: "50%",
+          background: "#1a1612",
+          border: "2px solid #fbf8f2",
+          boxShadow: "0 1px 3px rgba(26,22,18,0.18)",
+          transition: "left 0.6s cubic-bezier(.4,0,.2,1)",
+        }}
+      />
+    </div>
+  );
+};
+
 const ExplainPanel = ({ data, isOpen, toggle }) => {
   const [copied, setCopied] = useState(false);
   if (!data) return null;
   const db   = data.explainability?.database;
   const sent = data.explainability?.sentiment;
-  const sentColor = sent?.label === "positive" ? "#10b981" : sent?.label === "negative" ? "#ef4444" : "#3b82f6";
-  const sentBg    = sent?.label === "positive" ? "rgba(16,185,129,0.08)" : sent?.label === "negative" ? "rgba(239,68,68,0.08)" : "rgba(59,130,246,0.08)";
+  const sentColor = sent?.label === "positive" ? "#3d6b3a" : sent?.label === "negative" ? "#a23a2a" : "#4a4036";
 
   const copyBreakdown = () => {
     const lines = [
@@ -442,8 +540,8 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
     <div style={{ marginTop: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button onClick={toggle} style={{
-          background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
-          color: "#4a6a8a", fontSize: 12, padding: "5px 12px", cursor: "pointer",
+          background: "none", border: "1px solid rgba(26,22,18,0.10)", borderRadius: 8,
+          color: "#6b5d4f", fontSize: 12, padding: "5px 12px", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 6,
           transition: "border-color 0.2s, color 0.2s"
         }}>
@@ -452,8 +550,8 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
         </button>
         {isOpen && (
           <button onClick={copyBreakdown} title="Copy breakdown" style={{
-            background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8,
-            color: copied ? "#10b981" : "#4a6a8a", fontSize: 11, padding: "5px 10px",
+            background: "none", border: "1px solid rgba(26,22,18,0.10)", borderRadius: 8,
+            color: copied ? "#3d6b3a" : "#6b5d4f", fontSize: 11, padding: "5px 10px",
             cursor: "pointer", transition: "color 0.2s, border-color 0.2s"
           }}>
             {copied ? "✓ Copied" : "⎘ Copy"}
@@ -464,14 +562,14 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
       {isOpen && (
         <div style={{
           marginTop: 10, padding: "18px 16px",
-          background: "rgba(8,14,28,0.85)",
-          border: "1px solid rgba(6,214,255,0.10)",
-          borderLeft: "2px solid rgba(6,214,255,0.35)",
+          background: "rgba(251,248,242,0.92)",
+          border: "1px solid rgba(184,73,42,0.10)",
+          borderLeft: "2px solid rgba(184,73,42,0.35)",
           borderRadius: "0 12px 12px 12px",
           animation: "fadeIn 0.25s ease"
         }}>
           {/* Confidence Factors */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#4a4036", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
             Confidence Breakdown
           </div>
           {data.confidence.factors.map((f, i) => <FactorBar key={i} factor={f} />)}
@@ -480,17 +578,17 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
           {db && db.lookups_performed?.length > 0 && (
             <div style={{
               marginTop: 4, marginBottom: 16, padding: "10px 12px",
-              background: "rgba(6,214,255,0.05)", border: "1px solid rgba(6,214,255,0.12)",
+              background: "rgba(184,73,42,0.05)", border: "1px solid rgba(184,73,42,0.12)",
               borderRadius: 8
             }}>
-              <div style={{ fontSize: 11, color: "#06d6ff", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
+              <div style={{ fontSize: 11, color: "#b8492a", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
                 Database Lookups
               </div>
               {db.lookups_performed.map((l, i) => (
-                <div key={i} style={{ fontSize: 12, color: "#7ab8e8", marginBottom: 2 }}>· {l}</div>
+                <div key={i} style={{ fontSize: 12, color: "#4a4036", marginBottom: 2 }}>· {l}</div>
               ))}
               {db.ids_extracted && Object.keys(db.ids_extracted).length > 0 && (
-                <div style={{ fontSize: 11, color: "#364d66", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 11, color: "#8a7a66", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
                   {JSON.stringify(db.ids_extracted)}
                 </div>
               )}
@@ -498,16 +596,16 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
           )}
 
           {/* Intent Candidates */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#4a4036", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
             Intent Analysis
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
             {data.explainability.intent.all_candidates.map((c, i) => (
               <span key={i} style={{
                 padding: "3px 10px", borderRadius: 20, fontSize: 11,
-                background: i === 0 ? "rgba(6,214,255,0.10)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${i === 0 ? "rgba(6,214,255,0.30)" : "rgba(255,255,255,0.06)"}`,
-                color: i === 0 ? "#06d6ff" : "#4a6a8a",
+                background: i === 0 ? "rgba(184,73,42,0.10)" : "rgba(26,22,18,0.06)",
+                border: `1px solid ${i === 0 ? "rgba(184,73,42,0.30)" : "rgba(26,22,18,0.09)"}`,
+                color: i === 0 ? "#b8492a" : "#6b5d4f",
                 fontWeight: i === 0 ? 600 : 400
               }}>
                 {c.intent}: {(c.score * 100).toFixed(0)}%
@@ -515,19 +613,11 @@ const ExplainPanel = ({ data, isOpen, toggle }) => {
             ))}
           </div>
 
-          {/* Sentiment */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a9dc4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-            Sentiment
+          {/* Sentiment Trajectory */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#4a4036", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+            Sentiment Trajectory
           </div>
-          {sent && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: sentBg, border: `1px solid ${sentColor}33`, color: sentColor
-            }}>
-              {sent.label === "positive" ? "↑" : sent.label === "negative" ? "↓" : "→"} {sent.label} · score {sent.score}
-            </span>
-          )}
+          {sent && <SentimentTrajectory sent={sent} sentColor={sentColor} />}
 
           {/* Missing info */}
           {data.confidence.missing_information?.length > 0 && (
@@ -573,20 +663,20 @@ const FeedbackButtons = ({ interactionId, useMock, onFeedback }) => {
 
   if (submitted) {
     return (
-      <div style={{ marginTop: 8, fontSize: 12, color: "#364d66" }}>
+      <div style={{ marginTop: 8, fontSize: 12, color: "#8a7a66" }}>
         {submitted === "up" ? "👍" : "👎"} Feedback recorded — thank you!
       </div>
     );
   }
 
   const btnStyle = {
-    background: "none", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 6,
-    padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#4a6a8a", lineHeight: 1,
+    background: "none", border: "1px solid rgba(26,22,18,0.10)", borderRadius: 6,
+    padding: "3px 10px", cursor: "pointer", fontSize: 14, color: "#6b5d4f", lineHeight: 1,
     transition: "border-color 0.2s, color 0.2s"
   };
   return (
     <div style={{ marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
-      <span style={{ fontSize: 11, color: "#364d66" }}>Helpful?</span>
+      <span style={{ fontSize: 11, color: "#8a7a66" }}>Helpful?</span>
       <button onClick={() => submit("up")} style={btnStyle} title="Helpful">👍</button>
       <button onClick={() => submit("down")} style={btnStyle} title="Not helpful">👎</button>
     </div>
@@ -608,17 +698,17 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
           padding: "12px 17px",
           borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
           background: isUser
-            ? "linear-gradient(135deg, #0e5fdc, #1a3fc4)"
-            : "rgba(12, 20, 36, 0.90)",
+            ? "linear-gradient(135deg, #1a1612, #3a2f25)"
+            : "rgba(251,248,242,0.96)",
           border: isUser
             ? "none"
-            : "1px solid rgba(6,214,255,0.10)",
-          color: isUser ? "#fff" : "#d8ecff",
+            : "1px solid rgba(184,73,42,0.10)",
+          color: isUser ? "#fff" : "#1a1612",
           fontSize: 14,
           lineHeight: 1.65,
           boxShadow: isUser
-            ? "0 4px 16px rgba(14,95,220,0.35), 0 1px 3px rgba(0,0,0,0.4)"
-            : "0 2px 12px rgba(0,0,0,0.35)"
+            ? "0 4px 16px rgba(26,22,18,0.20), 0 1px 3px rgba(26,22,18,0.06)"
+            : "0 2px 12px rgba(26,22,18,0.06)"
         }}>
           {msg.text}
         </div>
@@ -630,7 +720,7 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
               <ConfidenceMeter score={msg.apiData.confidence.score} level={msg.apiData.confidence.level} />
               <DataBadge meta={msg.apiData.response_meta} />
             </div>
-            <div style={{ fontSize: 12, color: "#364d66", marginTop: 5, maxWidth: 420, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: "#8a7a66", marginTop: 5, maxWidth: 420, lineHeight: 1.5 }}>
               {msg.apiData.confidence.description}
             </div>
             <FeedbackButtons interactionId={msg.apiData.interaction_id} useMock={useMock} />
@@ -642,10 +732,10 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
           <div style={{
             marginTop: 10, padding: "10px 14px",
             background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)",
-            borderRadius: 10, fontSize: 12, color: "#fca5a5"
+            borderRadius: 10, fontSize: 12, color: "#a23a2a"
           }}>
-            <strong style={{ color: "#f87171" }}>Human handoff recommended</strong>
-            <div style={{ marginTop: 3, color: "#9a6a6a" }}>{msg.apiData.handoff.reasons.join("; ")}</div>
+            <strong style={{ color: "#a23a2a" }}>Human handoff recommended</strong>
+            <div style={{ marginTop: 3, color: "#8a3520" }}>{msg.apiData.handoff.reasons.join("; ")}</div>
             <a href="tel:3612713642" style={{
               display: "inline-block", marginTop: 8, padding: "6px 14px",
               background: "linear-gradient(135deg, #dc2626, #b91c1c)",
@@ -667,18 +757,18 @@ const ChatMessage = ({ msg, explainOpen, toggleExplain, useMock }) => {
 /* ═══════════════════════════════════════════════════════════════
    ANALYTICS DASHBOARD (Feature 5)
    ═══════════════════════════════════════════════════════════════ */
-const StatCard = ({ label, value, sub, color = "#e2eeff" }) => (
+const StatCard = ({ label, value, sub, color = "#1a1612" }) => (
   <div style={{
     flex: "1 1 180px", padding: "18px 20px",
-    background: "rgba(12, 20, 36, 0.80)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderLeft: "2px solid rgba(6,214,255,0.25)",
+    background: "rgba(251,248,242,0.88)",
+    border: "1px solid rgba(26,22,18,0.09)",
+    borderLeft: "2px solid rgba(184,73,42,0.25)",
     borderRadius: 14,
-    boxShadow: "0 2px 16px rgba(0,0,0,0.3)"
+    boxShadow: "0 2px 16px rgba(26,22,18,0.05)"
   }}>
-    <div style={{ fontSize: 11, color: "#364d66", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1.1 }}>{label}</div>
+    <div style={{ fontSize: 11, color: "#8a7a66", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1.1 }}>{label}</div>
     <div style={{ fontSize: 26, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -0.5 }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: "#364d66", marginTop: 4 }}>{sub}</div>}
+    {sub && <div style={{ fontSize: 11, color: "#8a7a66", marginTop: 4 }}>{sub}</div>}
   </div>
 );
 
@@ -687,11 +777,11 @@ const IntentBar = ({ intent, count, max }) => {
   return (
     <div style={{ marginBottom: 9 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-        <span style={{ color: "#a8c0de" }}>{intent}</span>
-        <span style={{ color: "#4a6a8a", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{count}</span>
+        <span style={{ color: "#4a4036" }}>{intent}</span>
+        <span style={{ color: "#6b5d4f", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{count}</span>
       </div>
-      <div style={{ height: 5, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #00b4a4, #3b82f6)", borderRadius: 3, transition: "width 0.7s cubic-bezier(.4,0,.2,1)" }} />
+      <div style={{ height: 5, background: "rgba(26,22,18,0.07)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #3d6b3a, #1a1612)", borderRadius: 3, transition: "width 0.7s cubic-bezier(.4,0,.2,1)" }} />
       </div>
     </div>
   );
@@ -743,7 +833,7 @@ function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 100,
-      background: "rgba(4,8,15,0.80)",
+      background: "rgba(245,241,234,0.90)",
       backdropFilter: "blur(6px)",
       WebkitBackdropFilter: "blur(6px)",
       display: "flex", alignItems: "center", justifyContent: "center"
@@ -753,21 +843,21 @@ function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
         animation: "slideUp 0.25s ease"
       }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#e2eeff" }}>Admin Access Required</div>
-          <div style={{ fontSize: 13, color: "#4a6a8a", marginTop: 4 }}>Sign in to view the dashboard</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#1a1612" }}>Admin Access Required</div>
+          <div style={{ fontSize: 13, color: "#6b5d4f", marginTop: 4 }}>Sign in to view the dashboard</div>
         </div>
         <div style={{
-          background: "rgba(12,20,34,0.90)",
+          background: "rgba(255,255,255,0.95)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid rgba(139,92,246,0.25)",
+          border: "1px solid rgba(184,73,42,0.22)",
           borderRadius: 20,
           padding: "28px 28px 24px",
-          boxShadow: "0 8px 48px rgba(0,0,0,0.6)"
+          boxShadow: "0 8px 48px rgba(26,22,18,0.10)"
         }}>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b5d4f", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
               <input
                 value={username} onChange={e => setUsername(e.target.value)}
                 autoFocus required placeholder="Enter admin username"
@@ -775,7 +865,7 @@ function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
               />
             </div>
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b5d4f", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)}
                 required placeholder="Enter admin password"
@@ -785,20 +875,20 @@ function DashboardLoginModal({ useMock, onSuccess, onCancel }) {
             {error && (
               <div style={{
                 background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
-                borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16
+                borderRadius: 10, padding: "10px 14px", color: "#a23a2a", fontSize: 13, marginBottom: 16
               }}>
                 {error}
               </div>
             )}
             <button type="submit" disabled={loading} className="btn-primary"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}>
+              style={{ background: "linear-gradient(135deg, #8a3520, #1a1612)" }}>
               {loading ? "Signing in…" : "Access Dashboard →"}
             </button>
           </form>
           <button onClick={onCancel}
             style={{ marginTop: 14, width: "100%", padding: "10px", fontSize: 13, fontWeight: 500,
-              border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, cursor: "pointer",
-              background: "transparent", color: "#4a6a8a" }}>
+              border: "1px solid rgba(26,22,18,0.09)", borderRadius: 10, cursor: "pointer",
+              background: "transparent", color: "#6b5d4f" }}>
             Cancel — stay in chat
           </button>
         </div>
@@ -864,24 +954,24 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#04080f", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: "#f5f1ea", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
       {/* Animated mesh gradient blobs */}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
         <div style={{
           position: "absolute", top: "35%", left: "30%", width: 520, height: 520,
-          background: "radial-gradient(circle, rgba(6,214,255,0.10) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(184,73,42,0.10) 0%, transparent 70%)",
           borderRadius: "50%", transform: "translate(-50%,-50%)",
           animation: "meshA 18s ease-in-out infinite"
         }} />
         <div style={{
           position: "absolute", top: "65%", left: "70%", width: 420, height: 420,
-          background: "radial-gradient(circle, rgba(139,92,246,0.09) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(184,73,42,0.08) 0%, transparent 70%)",
           borderRadius: "50%", transform: "translate(-50%,-50%)",
           animation: "meshB 22s ease-in-out infinite"
         }} />
         <div style={{
           position: "absolute", top: "20%", left: "70%", width: 300, height: 300,
-          background: "radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(26,22,18,0.06) 0%, transparent 70%)",
           borderRadius: "50%", transform: "translate(-50%,-50%)",
           animation: "meshA 28s ease-in-out infinite reverse"
         }} />
@@ -892,29 +982,29 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{
             width: 60, height: 60, borderRadius: 18,
-            background: "linear-gradient(135deg, #06d6ff, #2563eb)",
-            boxShadow: "0 0 28px rgba(6,214,255,0.30)",
+            background: "linear-gradient(135deg, #b8492a, #1a1612)",
+            boxShadow: "0 0 28px rgba(184,73,42,0.30)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 28, margin: "0 auto 18px"
           }}>{"\u{1F916}"}</div>
-          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6, color: "#e2eeff" }}>Intelligent Support</div>
-          <div style={{ fontSize: 13, color: "#4a6a8a", marginTop: 6, letterSpacing: 0.1 }}>Sign in to access the platform</div>
+          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6, color: "#1a1612" }}>Intelligent Support</div>
+          <div style={{ fontSize: 13, color: "#6b5d4f", marginTop: 6, letterSpacing: 0.1 }}>Sign in to access the platform</div>
         </div>
 
         {/* Tab Switcher */}
-        <div style={{ display: "flex", background: "rgba(12,20,34,0.72)", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(6,214,255,0.16)", marginBottom: 16 }}>
+        <div style={{ display: "flex", background: "rgba(251,248,242,0.92)", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(184,73,42,0.16)", marginBottom: 16 }}>
           <button type="button" onClick={() => switchTab("user")}
             style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-              background: activeTab === "user" ? "rgba(6,214,255,0.15)" : "transparent",
-              color: activeTab === "user" ? "#06d6ff" : "#4a6a8a",
+              background: activeTab === "user" ? "rgba(184,73,42,0.15)" : "transparent",
+              color: activeTab === "user" ? "#b8492a" : "#6b5d4f",
               transition: "background 0.2s, color 0.2s" }}>
             User Access
           </button>
           <button type="button" onClick={() => switchTab("admin")}
             style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-              borderLeft: "1px solid rgba(6,214,255,0.16)",
-              background: activeTab === "admin" ? "rgba(139,92,246,0.15)" : "transparent",
-              color: activeTab === "admin" ? "#a78bfa" : "#4a6a8a",
+              borderLeft: "1px solid rgba(184,73,42,0.16)",
+              background: activeTab === "admin" ? "rgba(184,73,42,0.14)" : "transparent",
+              color: activeTab === "admin" ? "#b8492a" : "#6b5d4f",
               transition: "background 0.2s, color 0.2s" }}>
             Admin Access
           </button>
@@ -922,17 +1012,17 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
 
         {/* Glass Card */}
         <div style={{
-          background: "rgba(12, 20, 34, 0.72)",
+          background: "rgba(251,248,242,0.88)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          border: activeTab === "user" ? "1px solid rgba(6,214,255,0.16)" : "1px solid rgba(139,92,246,0.20)",
+          border: activeTab === "user" ? "1px solid rgba(184,73,42,0.16)" : "1px solid rgba(184,73,42,0.18)",
           borderRadius: 20,
           padding: "32px 32px 28px",
-          boxShadow: "0 8px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset"
+          boxShadow: "0 8px 48px rgba(26,22,18,0.08), 0 0 0 1px rgba(26,22,18,0.04) inset"
         }}>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b5d4f", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Username</div>
               <input
                 value={username} onChange={e => setUsername(e.target.value)}
                 autoFocus required placeholder={activeTab === "user" ? "Enter your username" : "Enter admin username"}
@@ -940,7 +1030,7 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
               />
             </div>
             <div style={{ marginBottom: 26 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#4a6a8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b5d4f", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Password</div>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)}
                 required placeholder="Enter your password"
@@ -950,27 +1040,27 @@ function LoginPage({ useMock, onToggleMock, onChatSuccess, onAdminSuccess }) {
             {error && (
               <div style={{
                 background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
-                borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 20
+                borderRadius: 10, padding: "10px 14px", color: "#a23a2a", fontSize: 13, marginBottom: 20
               }}>
                 {error}
               </div>
             )}
             <button type="submit" disabled={loading} className="btn-primary"
-              style={{ background: activeTab === "admin" ? "linear-gradient(135deg, #7c3aed, #4f46e5)" : undefined }}>
+              style={{ background: activeTab === "admin" ? "linear-gradient(135deg, #8a3520, #1a1612)" : undefined }}>
               {loading ? "Signing in…" : activeTab === "user" ? "Sign In →" : "Admin Sign In →"}
             </button>
           </form>
         </div>
 
         {/* Mock mode toggle */}
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: "#1e3048" }}>
+        <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: "#d9cfbf" }}>
           <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <input type="checkbox" checked={!useMock} onChange={onToggleMock} style={{ accentColor: "#06d6ff" }} />
+            <input type="checkbox" checked={!useMock} onChange={onToggleMock} style={{ accentColor: "#b8492a" }} />
             <span>Live API {useMock ? "(Mock mode on)" : "(Live mode)"}</span>
           </label>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#1e3048", letterSpacing: 0.5 }}>
+        <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#d9cfbf", letterSpacing: 0.5 }}>
           NLP &bull; Database Verified &bull; Confidence Scoring &bull; XAI
         </div>
       </div>
@@ -1058,7 +1148,7 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
   }
   if (error) {
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#f87171" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#a23a2a" }}>
         <div>{error}</div>
         <button onClick={fetchData} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-elevated)", color: "var(--text-primary)", cursor: "pointer", fontSize: 13 }}>Retry</button>
       </div>
@@ -1074,14 +1164,14 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
       {/* KPI Cards */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <StatCard label="Total Queries" value={data.total_queries} />
-        <StatCard label="Resolution Rate" value={`${data.resolution_rate}%`} sub={`${data.handoff_count} handoffs`} color="#10b981" />
-        <StatCard label="Avg Confidence" value={`${data.avg_confidence}%`} color={data.avg_confidence >= 60 ? "#10b981" : data.avg_confidence >= 40 ? "#f59e0b" : "#ef4444"} />
+        <StatCard label="Resolution Rate" value={`${data.resolution_rate}%`} sub={`${data.handoff_count} handoffs`} color="#3d6b3a" />
+        <StatCard label="Avg Confidence" value={`${data.avg_confidence}%`} color={data.avg_confidence >= 60 ? "#3d6b3a" : data.avg_confidence >= 40 ? "#f59e0b" : "#ef4444"} />
         <StatCard label="Avg Rating" value={data.avg_feedback_rating.toFixed(1)} sub={`${data.total_feedback} reviews`} color="#f59e0b" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Intent Distribution */}
-        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(6,214,255,0.20)", borderRadius: 12 }}>
+        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(184,73,42,0.20)", borderRadius: 12 }}>
           <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: 0.8 }}>Query Trends</h3>
           {data.intent_distribution.map((d, i) => (
             <IntentBar key={i} intent={d.detected_intent} count={d.cnt} max={maxIntent} />
@@ -1089,13 +1179,13 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
         </div>
 
         {/* Daily Volume Chart */}
-        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(139,92,246,0.20)", borderRadius: 12 }}>
+        <div style={{ padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "2px solid rgba(184,73,42,0.18)", borderRadius: 12 }}>
           <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: 0.8 }}>Daily Volume</h3>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 140 }}>
             {data.daily_volume.map((d, i) => (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                 <div style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>{d.cnt}</div>
-                <div style={{ width: "100%", background: "linear-gradient(180deg, #06d6ff, #2563eb)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4, opacity: 0.8 }} />
+                <div style={{ width: "100%", background: "linear-gradient(180deg, #b8492a, #1a1612)", borderRadius: "3px 3px 0 0", height: `${(d.cnt / dailyMax) * 110}px`, transition: "height 0.5s ease", minHeight: 4, opacity: 0.8 }} />
                 <div style={{ fontSize: 9, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{String(d.day).slice(5)}</div>
               </div>
             ))}
@@ -1117,11 +1207,11 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
             </thead>
             <tbody>
               {data.recent_feedback.map((fb, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                <tr key={i} style={{ borderBottom: "1px solid rgba(26,22,18,0.04)" }}>
                   <td style={{ padding: "9px 10px" }}>
                     <span style={{ display: "inline-block", width: 28, textAlign: "center", padding: "2px 0", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
-                      background: fb.rating >= 4 ? "rgba(16,185,129,0.12)" : fb.rating <= 2 ? "rgba(239,68,68,0.12)" : "rgba(59,130,246,0.12)",
-                      color: fb.rating >= 4 ? "#4ade80" : fb.rating <= 2 ? "#f87171" : "#60a5fa" }}>
+                      background: fb.rating >= 4 ? "rgba(16,185,129,0.12)" : fb.rating <= 2 ? "rgba(239,68,68,0.12)" : "rgba(26,22,18,0.10)",
+                      color: fb.rating >= 4 ? "#5a8a55" : fb.rating <= 2 ? "#f87171" : "#4a4036" }}>
                       {fb.rating}
                     </span>
                   </td>
@@ -1146,7 +1236,7 @@ const AnalyticsDashboard = ({ useMock, token, onAuthError }) => {
             <div key={i} style={{ padding: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: "var(--text-primary)", fontWeight: 500 }}>"{c.user_message}"</span>
-                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.12)", color: "#f87171", fontWeight: 600 }}>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.12)", color: "#a23a2a", fontWeight: 600 }}>
                   Rating: {c.rating}/5
                 </span>
               </div>
@@ -1276,7 +1366,7 @@ export default function App() {
       <div style={{
         padding: "14px 24px",
         borderBottom: "1px solid var(--border)",
-        background: "rgba(8,14,28,0.92)",
+        background: "rgba(251,248,242,0.96)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1285,13 +1375,13 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10,
-            background: "linear-gradient(135deg, #06d6ff, #2563eb)",
-            boxShadow: "0 0 16px rgba(6,214,255,0.25)",
+            background: "linear-gradient(135deg, #b8492a, #1a1612)",
+            boxShadow: "0 0 16px rgba(184,73,42,0.25)",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17
           }}>{"\u{1F916}"}</div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3, color: "var(--text-primary)" }}>Intelligent Support</div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: 0.6, textTransform: "uppercase" }}>NLP · DB Verified · Confidence Scoring · XAI</div>
+            <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 500, letterSpacing: -0.5, color: "var(--ink)", lineHeight: 1, fontStyle: "italic" }}>Atlas</div>
+            <div style={{ fontSize: 10, color: "var(--ink-muted)", letterSpacing: 1.4, textTransform: "uppercase", marginTop: 2 }}>Customer Support · Verified by Data</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1299,14 +1389,14 @@ export default function App() {
           <div style={{ display: "flex", background: "var(--bg-surface)", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
             <button onClick={() => setView("chat")}
               style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "chat" ? "rgba(6,214,255,0.15)" : "transparent",
+                background: view === "chat" ? "rgba(184,73,42,0.15)" : "transparent",
                 color: view === "chat" ? "var(--accent-cyan)" : "var(--text-muted)",
                 borderRight: "1px solid var(--border)" }}>
               Chat
             </button>
             <button onClick={handleDashboardClick}
               style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-                background: view === "dashboard" ? "rgba(6,214,255,0.15)" : "transparent",
+                background: view === "dashboard" ? "rgba(184,73,42,0.15)" : "transparent",
                 color: view === "dashboard" ? "var(--accent-cyan)" : "var(--text-muted)" }}>
               Dashboard
             </button>
@@ -1338,11 +1428,31 @@ export default function App() {
       {view === "chat" ? (
         <>
           {/* Quick Prompts */}
-          <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding: "10px 24px", display: "flex", gap: 8, overflowX: "auto", borderBottom: "1px solid var(--rule)" }}>
             {quickPrompts.map((p, i) => (
               <button key={i} onClick={() => setInput(p)} className="prompt-pill">{p}</button>
             ))}
           </div>
+
+          {/* Session Sentiment Ribbon */}
+          {(() => {
+            const latest = [...messages].reverse().find(m => m.role !== "user" && m.apiData?.explainability?.sentiment);
+            const s = latest?.apiData?.explainability?.sentiment;
+            if (!s) return null;
+            return (
+              <div style={{ padding: "10px 24px 4px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--rule-soft)" }}>
+                <span style={{ fontSize: 10, color: "#8a7a66", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 600 }}>
+                  Mood
+                </span>
+                <div style={{ flex: 1, maxWidth: 420 }}>
+                  <SentimentRibbon rolling={s.rolling_score ?? s.score ?? 0} label={s.label} />
+                </div>
+                <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic", fontSize: 13, color: "#4a4036" }}>
+                  {s.label}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: "auto", padding: "24px 24px 8px" }}>
@@ -1376,11 +1486,11 @@ export default function App() {
               <button onClick={send} disabled={loading || !input.trim()}
                 style={{
                   padding: "13px 26px", borderRadius: "var(--r-lg)", border: "none",
-                  background: loading || !input.trim() ? "var(--bg-elevated)" : "linear-gradient(135deg, #0ea5ea, #2563eb)",
+                  background: loading || !input.trim() ? "var(--bg-elevated)" : "linear-gradient(135deg, #b8492a, #1a1612)",
                   color: loading || !input.trim() ? "var(--text-muted)" : "#fff",
                   fontSize: 14, fontWeight: 600, cursor: loading || !input.trim() ? "default" : "pointer",
                   transition: "opacity 0.2s, box-shadow 0.2s",
-                  boxShadow: loading || !input.trim() ? "none" : "0 4px 16px rgba(6,214,255,0.20)"
+                  boxShadow: loading || !input.trim() ? "none" : "0 4px 16px rgba(184,73,42,0.20)"
                 }}>
                 Send
               </button>

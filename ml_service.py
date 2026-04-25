@@ -77,19 +77,24 @@ def ml_classify_intent(text: str) -> dict:
         "matched_keywords": {}
     }
 
+_SENTIMENT_LABEL_MAP = {
+    "label_0": "negative",
+    "label_1": "neutral",
+    "label_2": "positive",
+    "negative": "negative",
+    "neutral": "neutral",
+    "positive": "positive",
+}
+
 def ml_analyze_sentiment(text: str) -> dict:
     if not sentiment_analyzer:
         return {"label": "neutral", "score": 0.5, "explanation": "ML unavailable"}
-    
-    res = sentiment_analyzer(text)[0] 
-    
-    # Convert HF pipeline sentiment output to internal API format
-    mapped_label = res["label"].lower()
-    if mapped_label not in ("positive", "neutral", "negative"):
-        mapped_label = "neutral"
-        
+
+    res = sentiment_analyzer(text)[0]
+    mapped_label = _SENTIMENT_LABEL_MAP.get(res["label"].lower(), "neutral")
+
     return {
         "label": mapped_label,
         "score": round(res["score"], 2),
-        "explanation": f"ML model detected {mapped_label} sentiment with {res['score']:.1%} confidence."
+        "explanation": f"ML model detected {mapped_label} sentiment with {res['score']:.1%} confidence.",
     }

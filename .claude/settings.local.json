@@ -36,7 +36,13 @@
       "Bash(python export_csv.py)",
       "Bash(npm search:*)",
       "Bash(bash scripts/install.sh --tool antigravity)",
-      "Bash(bash scripts/convert.sh --tool antigravity)"
+      "Bash(bash scripts/convert.sh --tool antigravity)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(graphify --help)",
+      "Bash(graphify install:*)",
+      "Bash(graphify claude:*)",
+      "Bash(LLM_AVAILABLE=0 python -m pytest test_app.py::TestSentimentEvolution -v)"
     ]
   }
 }

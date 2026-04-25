@@ -291,5 +291,43 @@ class TestUserAuth:
         assert res.status_code == 400
 
 
+class TestSentimentEvolution:
+    """Rolling session sentiment surfaces a trajectory across messages."""
+
+    def _post(self, client, msg, sid):
+        res = client.post("/api/chat", json={"message": msg, "session_id": sid})
+        assert res.status_code == 200
+        return res.get_json()["explainability"]["sentiment"]
+
+    def test_rolling_score_rises_after_neutral_then_positive(self, client):
+        sid = "evo-pos"
+        s1 = self._post(client, "where is my order", sid)  # neutral
+        s2 = self._post(client, "this is great and amazing", sid)  # positive
+        assert s2["rolling_score"] > s1["rolling_score"]
+        assert s2["trend"] == "improving"
+
+    def test_delta_negative_on_mood_swing(self, client):
+        sid = "evo-swing"
+        self._post(client, "this is great and amazing", sid)
+        s2 = self._post(client, "this is terrible and awful", sid)
+        assert s2["delta"] < 0
+        assert s2["trend"] == "worsening"
+
+    def test_rolling_score_drifts_toward_new_signal(self, client):
+        sid = "evo-moves"
+        self._post(client, "where is my order", sid)            # neutral, ema ≈ 0
+        s2 = self._post(client, "this is great", sid)            # positive
+        s3 = self._post(client, "this is great", sid)            # positive again
+        # EMA keeps drifting toward 1.0 across consecutive positives after a neutral start.
+        assert s3["rolling_score"] > s2["rolling_score"] or s3["rolling_score"] == s2["rolling_score"] == 1.0
+        assert len(s3["history"]) == 3
+
+    def test_history_grows_with_session(self, client):
+        sid = "evo-hist"
+        for msg in ["hello", "thanks", "goodbye"]:
+            last = self._post(client, msg, sid)
+        assert len(last["history"]) == 3
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
