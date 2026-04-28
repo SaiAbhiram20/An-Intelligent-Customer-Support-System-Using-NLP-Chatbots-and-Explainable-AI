@@ -1,0 +1,8 @@
+id,customer_id,email,first_name,last_name,phone,created_at,updated_at,status,preferred_contact,timezone,language
+bfe5b146-52f6-4a15-86fa-3c8a9f60567f,CUST-001001,sarah.johnson@email.com,Sarah,Johnson,-655,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+094b8e85-8314-4b39-a526-0c87384f303c,CUST-001002,mike.chen@email.com,Mike,Chen,-656,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+88596062-540e-4a2b-b903-6b0d5c033af6,CUST-001003,emily.rodriguez@email.com,Emily,Rodriguez,-657,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+04fffdea-30e3-4c09-bde9-3864dee0cf91,CUST-001004,james.wilson@email.com,James,Wilson,-658,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+fad87335-a017-4367-8f94-b260ab65b4c5,CUST-001005,lisa.patel@email.com,Lisa,Patel,-659,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+6b1b052a-6820-4858-94d3-da023a7e18b0,CUST-001006,david.kim@email.com,David,Kim,-660,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,active,email,UTC,en
+9de81a3b-449b-4613-a705-e96684730c94,CUST-001007,anna.mueller@email.com,Anna,Mueller,-661,2026-02-20 17:53:45.522168-06:00,2026-02-20 17:53:45.522168-06:00,inactive,email,UTC,en
