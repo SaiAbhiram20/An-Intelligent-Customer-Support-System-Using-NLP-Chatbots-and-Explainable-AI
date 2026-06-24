@@ -19,7 +19,11 @@
 
 ## 🎥 Demo
 
-[![Watch the Atlas demo](assets/demo-thumbnail.jpg)](assets/demo.mp4)
+
+
+https://github.com/user-attachments/assets/3a323f1a-9df6-4340-9175-35de9e346096
+
+
 
 ▶️ **[Click the image above to watch the full walkthrough](assets/demo.mp4)** — intent detection, live database lookups, the transparent confidence breakdown, and automatic human-handoff in action.
 
